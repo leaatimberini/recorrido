@@ -566,31 +566,148 @@ header.header-panel {
     text-transform: uppercase;
 }
 
+/* Mobile stats bar */
+.mobile-stats-bar {
+    display: none;
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 102;
+    width: 92%;
+    max-width: 480px;
+    background: rgba(7, 12, 28, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 16px;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    pointer-events: auto;
+}
+
+.m-stat-route {
+    font-weight: 800;
+    color: var(--oro);
+    font-size: 0.85rem;
+}
+
+.m-stat-item {
+    font-size: 0.75rem;
+    color: var(--blanco);
+}
+
+.m-label {
+    color: rgba(255,255,255,0.4);
+    font-weight: 600;
+    margin-right: 4px;
+}
+
 /* Responsive styles */
-@media (max-width: 1024px) {
-    .ui-overlay {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto auto auto;
-        overflow-y: auto;
-        pointer-events: auto; /* Enable scroll on overlay wrapper */
-        gap: 16px;
-        padding: 16px;
+@media (max-width: 768px) {
+    .mobile-stats-bar {
+        display: flex;
     }
     
-    .interactive-panel {
-        max-height: none !important;
+    .ui-overlay {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        padding: 12px;
+        height: 100%;
+        overflow: hidden;
+    }
+    
+    header.header-panel {
+        margin-top: 55px; /* space for mobile stats bar */
+        padding: 12px 18px;
+        grid-column: 1;
+        grid-row: 1;
+    }
+    
+    .brand h1 {
+        font-size: 1.05rem;
+    }
+    
+    .badge-vuelo {
+        padding: 3px 8px;
+        font-size: 0.65rem;
+    }
+    
+    .telemetry-panel {
+        position: absolute;
+        left: 12px;
+        top: 135px;
+        width: calc(100% - 24px);
+        max-height: calc(100vh - 310px);
+        z-index: 100;
+        transform: translateX(-120%);
+        transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        pointer-events: auto;
         grid-column: 1 !important;
         grid-row: auto !important;
     }
     
-    .control-panel {
+    .telemetry-panel.active {
+        transform: translateX(0);
+    }
+    
+    .tribute-panel {
+        position: absolute;
+        right: 12px;
+        top: 135px;
+        width: calc(100% - 24px);
+        max-height: calc(100vh - 310px);
+        z-index: 100;
+        transform: translateX(120%);
+        transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        pointer-events: auto;
+        grid-column: 1 !important;
+        grid-row: auto !important;
+    }
+    
+    .tribute-panel.active {
+        transform: translateX(0);
+    }
+    
+    footer.control-panel {
+        position: absolute;
+        bottom: 12px;
+        left: 12px;
+        width: calc(100% - 24px);
         flex-direction: column;
-        align-items: stretch;
-        gap: 16px;
+        gap: 12px;
+        padding: 12px 16px;
+        pointer-events: auto;
+        z-index: 101;
+        grid-column: 1 !important;
+        grid-row: auto !important;
     }
     
     .control-group {
+        width: 100%;
         justify-content: space-between;
+    }
+    
+    .control-group .btn {
+        padding: 8px 12px;
+        font-size: 0.75rem;
+    }
+    
+    .speed-selector {
+        padding: 2px;
+    }
+    
+    .speed-btn {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+    }
+    
+    .vancouver-credit {
+        font-size: 0.65rem;
+        text-align: center;
+        width: 100%;
     }
     
     .instructions-overlay {

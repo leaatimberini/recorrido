@@ -34,6 +34,7 @@ let flightState = {
 // Web Audio API State
 let audioCtx = null;
 let synthInterval = null;
+let melodyInterval = null;
 let isAudioPlaying = false;
 let masterGain = null;
 
@@ -42,7 +43,7 @@ let scene, camera, renderer, controls;
 let earthMesh, starsPoints, atmosphereMesh;
 let flightCurve, flightLine, planeMarker, flightParticles;
 let miamiPin, rosarioPin;
-let particleGeometry, particlePositions, particleCount = 120;
+let particleGeometry, particlePositions, particleCount = 180;
 let flightTangent = new THREE.Vector3();
 
 // DOM Elements
@@ -52,6 +53,15 @@ const speedBtn100 = document.getElementById('speed-100');
 const speedBtn1000 = document.getElementById('speed-1000');
 const playPauseBtn = document.getElementById('play-pause');
 const audioBtn = document.getElementById('btn-audio');
+
+// Mobile DOM Elements
+const btnTogglePanels = document.getElementById('btn-toggle-panels');
+const telemetryAside = document.getElementById('telemetry-aside');
+const tributeAside = document.getElementById('tribute-aside');
+
+const mValSpeed = document.getElementById('m-val-speed');
+const mValAlt = document.getElementById('m-val-alt');
+const mValProg = document.getElementById('m-val-prog');
 
 // Header Status Elements
 const statusDot = document.querySelector('.status-dot');
@@ -68,6 +78,44 @@ const valRemaining = document.getElementById('val-remaining');
 const progressBarFill = document.getElementById('progress-bar-fill');
 const progressPercent = document.getElementById('progress-percent');
 
+// -------------------------------------------------------------
+// WEB AUDIO API - "MUCHACHOS" MELODY AND CHORDS
+// -------------------------------------------------------------
+// Chorus of "Muchachos" notes in A minor/C major
+const NOTE_FREQS = {
+    'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88, 'C5': 523.25, 'D5': 587.33, 'E5': 659.25,
+    'F5': 698.46, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77, 'C6': 1046.50, 'D6': 1174.66, 'E6': 1318.51
+};
+
+const muchachosMelody = [
+    // Mu-cha-chos
+    { note: 'E5', dur: 0.35 }, { note: 'A5', dur: 0.35 }, { note: 'C6', dur: 0.6 },
+    // A-ho-ra nos vol-vi-mos a i-lu-sio-nar
+    { note: 'B5', dur: 0.25 }, { note: 'A5', dur: 0.45 },
+    { note: 'G5', dur: 0.35 }, { note: 'A5', dur: 0.35 }, { note: 'B5', dur: 0.35 },
+    { note: 'B5', dur: 0.25 }, { note: 'B5', dur: 0.25 }, { note: 'B5', dur: 0.25 }, { note: 'A5', dur: 0.25 }, { note: 'B5', dur: 0.25 }, { note: 'C6', dur: 0.35 }, { note: 'A5', dur: 0.8 },
+    
+    // Quie-ro ga-nar la ter-ce-ra
+    { note: 'D5', dur: 0.35 }, { note: 'G5', dur: 0.35 }, { note: 'B5', dur: 0.6 },
+    // Quie-ro ser cam-peon mun-dial
+    { note: 'A5', dur: 0.25 }, { note: 'G5', dur: 0.45 },
+    { note: 'F5', dur: 0.35 }, { note: 'G5', dur: 0.35 }, { note: 'A5', dur: 0.35 },
+    { note: 'A5', dur: 0.25 }, { note: 'A5', dur: 0.25 }, { note: 'A5', dur: 0.25 }, { note: 'G5', dur: 0.25 }, { note: 'A5', dur: 0.25 }, { note: 'B5', dur: 0.35 }, { note: 'G5', dur: 0.8 },
+    
+    // Y al Die-go... en el cie-lo lo po-de-mos ver
+    { note: 'E5', dur: 0.35 }, { note: 'A5', dur: 0.35 }, { note: 'C6', dur: 0.6 },
+    { note: 'B5', dur: 0.25 }, { note: 'A5', dur: 0.45 },
+    { note: 'G5', dur: 0.35 }, { note: 'A5', dur: 0.35 }, { note: 'B5', dur: 0.35 },
+    { note: 'B5', dur: 0.25 }, { note: 'B5', dur: 0.25 }, { note: 'B5', dur: 0.25 }, { note: 'A5', dur: 0.25 }, { note: 'B5', dur: 0.25 }, { note: 'C6', dur: 0.35 }, { note: 'A5', dur: 0.8 },
+    
+    // Con Don Die-go y con la To-ta
+    { note: 'D5', dur: 0.35 }, { note: 'G5', dur: 0.35 }, { note: 'B5', dur: 0.6 },
+    // Alen-dan-do-lo a Lio-nel!
+    { note: 'A5', dur: 0.25 }, { note: 'G5', dur: 0.45 },
+    { note: 'F5', dur: 0.35 }, { note: 'G5', dur: 0.35 }, { note: 'A5', dur: 0.35 },
+    { note: 'A5', dur: 0.25 }, { note: 'A5', dur: 0.25 }, { note: 'A5', dur: 0.25 }, { note: 'G5', dur: 0.25 }, { note: 'A5', dur: 0.25 }, { note: 'B5', dur: 0.35 }, { note: 'A5', dur: 1.0 }
+];
+
 // Initialize the application
 function init() {
     setupThree();
@@ -81,8 +129,6 @@ function init() {
     setInterval(pollLiveFlightData, 15000);
     
     animate(0);
-    
-    // Set initial speed styling
     updateSpeedControls();
 }
 
@@ -112,7 +158,7 @@ function setupThree() {
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.minDistance = 120;
+    controls.minDistance = 60; // Allow closer zoom to see the plane & 10 crown badge
     controls.maxDistance = 400;
     
     // Lights
@@ -142,14 +188,12 @@ function onWindowResize() {
 // ENVIRONMENT & STARFIELD
 // -------------------------------------------------------------
 function createEnvironment() {
-    // Starfield system
     const starsCount = 2000;
     const starsGeom = new THREE.BufferGeometry();
     const positions = new Float32Array(starsCount * 3);
     const colors = new Float32Array(starsCount * 3);
     
     for (let i = 0; i < starsCount; i++) {
-        // Random point on sphere far away
         const radius = 400 + Math.random() * 200;
         const u = Math.random();
         const v = Math.random();
@@ -160,12 +204,11 @@ function createEnvironment() {
         positions[i * 3 + 1] = radius * Math.cos(phi);
         positions[i * 3 + 2] = radius * Math.sin(phi) * Math.cos(theta);
         
-        // Colors: mostly white/silver, some argentine celeste tones
         const arg = Math.random();
         if (arg > 0.8) {
-            colors[i * 3] = 0.45; // R
-            colors[i * 3 + 1] = 0.67; // G
-            colors[i * 3 + 2] = 0.87; // B (Celeste)
+            colors[i * 3] = 0.45; // Celeste
+            colors[i * 3 + 1] = 0.67;
+            colors[i * 3 + 2] = 0.87;
         } else {
             const bright = 0.6 + Math.random() * 0.4;
             colors[i * 3] = bright;
@@ -196,7 +239,6 @@ function createGlobe() {
     const earthGeo = new THREE.SphereGeometry(GLOBE_RADIUS, 64, 64);
     const textureLoader = new THREE.TextureLoader();
     
-    // High-quality earth textures from unpkg (three-globe examples)
     const earthTextureUrl = 'https://unpkg.com/three-globe/example/img/earth-night.jpg';
     const bumpTextureUrl = 'https://unpkg.com/three-globe/example/img/earth-topology.png';
     
@@ -206,17 +248,15 @@ function createGlobe() {
         metalness: 0.1,
     });
     
-    // Try to load textures, fallback gracefully on error
     textureLoader.load(earthTextureUrl, 
         (texture) => {
             earthMat.map = texture;
-            earthMat.color.setHex(0xffffff); // resetting to full white to let texture show
+            earthMat.color.setHex(0xffffff);
             earthMat.needsUpdate = true;
         },
         undefined,
         (err) => {
-            console.warn("Could not load night earth texture, generating procedural fallback.", err);
-            // Procedural fallback map drawn onto canvas
+            console.warn("Could not load earth texture, using dynamic fallback.");
             const canvas = document.createElement('canvas');
             canvas.width = 1024;
             canvas.height = 512;
@@ -229,8 +269,7 @@ function createGlobe() {
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Draw grid lines
-            ctx.strokeStyle = 'rgba(116, 172, 223, 0.15)'; // faint celeste
+            ctx.strokeStyle = 'rgba(116, 172, 223, 0.15)';
             ctx.lineWidth = 1;
             
             const numLat = 18;
@@ -244,18 +283,17 @@ function createGlobe() {
                 ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
             }
             
-            // Draw stylized continent dots
             ctx.fillStyle = 'rgba(116, 172, 223, 0.4)';
             for (let i = 0; i < 2000; i++) {
                 const x = Math.random() * canvas.width;
                 const y = Math.random() * canvas.height;
                 
                 let isLand = false;
-                if (x > 250 && x < 380 && y > 280 && y < 480) isLand = true; // South America
-                if (x > 100 && x < 300 && y > 100 && y < 280) isLand = true; // North America
+                if (x > 250 && x < 380 && y > 280 && y < 480) isLand = true; // SA
+                if (x > 100 && x < 300 && y > 100 && y < 280) isLand = true; // NA
                 if (x > 450 && x < 580 && y > 220 && y < 400) isLand = true; // Africa
                 if (x > 470 && x < 600 && y > 100 && y < 220) isLand = true; // Europe
-                if (x > 600 && x < 900 && y > 100 && y < 480) isLand = true; // Asia / Australia
+                if (x > 600 && x < 900 && y > 100 && y < 480) isLand = true; // Asia / Aus
                 
                 if (isLand) {
                     ctx.beginPath();
@@ -283,7 +321,6 @@ function createGlobe() {
     
     // Atmospheric glow
     const atmosphereGeo = new THREE.SphereGeometry(GLOBE_RADIUS * 1.015, 64, 64);
-    
     const vertexShader = `
         varying vec3 vNormal;
         void main() {
@@ -291,12 +328,11 @@ function createGlobe() {
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
     `;
-    
     const fragmentShader = `
         varying vec3 vNormal;
         void main() {
             float intensity = pow(0.65 - dot(vNormal, vec3(0, 0, 1.0)), 2.5);
-            gl_FragColor = vec4(0.45, 0.67, 0.87, 1.0) * intensity * 0.7;
+            gl_FragColor = vec4(0.45, 0.67, 0.87, 1.0) * intensity * 0.75;
         }
     `;
     
@@ -344,7 +380,6 @@ function createFlightPath() {
     const startVec = latLngToVector3(MIAMI_COORDS.lat, MIAMI_COORDS.lng, GLOBE_RADIUS);
     const endVec = latLngToVector3(ROSARIO_COORDS.lat, ROSARIO_COORDS.lng, GLOBE_RADIUS);
     
-    // Calculate control points for a smooth, high-altitude 3D bezier arc
     const midPoint = new THREE.Vector3().addVectors(startVec, endVec).multiplyScalar(0.5);
     const distance = startVec.distanceTo(endVec);
     
@@ -359,14 +394,14 @@ function createFlightPath() {
     
     flightCurve = new THREE.CubicBezierCurve3(startVec, control1, control2, endVec);
     
-    // Create the visible path line
+    // Route Line
     const points = flightCurve.getPoints(100);
     const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
     const lineMat = new THREE.LineBasicMaterial({
         color: 0x74acdf,
-        linewidth: 2,
+        linewidth: 3,
         transparent: true,
-        opacity: 0.6
+        opacity: 0.65
     });
     
     flightLine = new THREE.Line(lineGeo, lineMat);
@@ -376,21 +411,22 @@ function createFlightPath() {
     miamiPin = createAirportMarker(startVec, 0x74acdf, "MIA");
     rosarioPin = createAirportMarker(endVec, 0xf6b426, "ROS");
     
-    // Procedural Airplane Model (Bombardier Global 6000)
+    // Procedural Airplane Group
     const planeGroup = new THREE.Group();
     
     const fuseGeo = new THREE.ConeGeometry(1.6, 7.5, 8);
     fuseGeo.rotateX(Math.PI / 2);
     const fuseMat = new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        roughness: 0.2,
-        metalness: 0.8,
+        roughness: 0.15,
+        metalness: 0.85,
         emissive: 0x74acdf,
-        emissiveIntensity: 0.1
+        emissiveIntensity: 0.15
     });
     const fuselage = new THREE.Mesh(fuseGeo, fuseMat);
     planeGroup.add(fuselage);
     
+    // Delta Wings
     const wingGeo = new THREE.BufferGeometry();
     const wingVertices = new Float32Array([
         0.0, 0.0, 1.5,
@@ -404,14 +440,15 @@ function createFlightPath() {
     wingGeo.computeVertexNormals();
     
     const wingMat = new THREE.MeshStandardMaterial({
-        color: 0xd8e6f3,
-        roughness: 0.3,
-        metalness: 0.7,
+        color: 0xe0ebf6,
+        roughness: 0.25,
+        metalness: 0.75,
         side: THREE.DoubleSide
     });
     const wings = new THREE.Mesh(wingGeo, wingMat);
     planeGroup.add(wings);
     
+    // Tail fin
     const tailGeo = new THREE.BufferGeometry();
     const tailVertices = new Float32Array([
         0.0, 0.0, -2.0,
@@ -422,13 +459,52 @@ function createFlightPath() {
     tailGeo.setAttribute('position', new THREE.BufferAttribute(tailVertices, 3));
     tailGeo.setIndex(tailIndices);
     tailGeo.computeVertexNormals();
-    
     const tail = new THREE.Mesh(tailGeo, wingMat);
     planeGroup.add(tail);
     
-    const engineLight = new THREE.PointLight(0x74acdf, 4, 15);
+    // Glowing exhaust
+    const engineLight = new THREE.PointLight(0xf6b426, 6, 18);
     engineLight.position.set(0, 0, -4.5);
     planeGroup.add(engineLight);
+    
+    // -------------------------------------------------------------
+    // PASSION TRIBUTE: GOLDEN "10" AND CROWN EMBLAZONED SPRITE
+    // -------------------------------------------------------------
+    const spriteCanvas = document.createElement('canvas');
+    spriteCanvas.width = 128;
+    spriteCanvas.height = 128;
+    const sCtx = spriteCanvas.getContext('2d');
+    
+    // Golden shield circle
+    sCtx.fillStyle = 'rgba(246, 180, 38, 0.25)';
+    sCtx.beginPath();
+    sCtx.arc(64, 64, 52, 0, Math.PI * 2);
+    sCtx.fill();
+    
+    sCtx.strokeStyle = '#F6B426';
+    sCtx.lineWidth = 4;
+    sCtx.stroke();
+    
+    // Glow effect
+    sCtx.shadowColor = '#F6B426';
+    sCtx.shadowBlur = 12;
+    
+    // Text: 10
+    sCtx.fillStyle = '#FFFFFF';
+    sCtx.font = 'bold 38px Outfit, Montserrat, sans-serif';
+    sCtx.textAlign = 'center';
+    sCtx.fillText('10', 64, 88);
+    
+    // Crown emoji
+    sCtx.font = '28px Outfit, sans-serif';
+    sCtx.fillText('👑', 64, 46);
+    
+    const spriteTexture = new THREE.CanvasTexture(spriteCanvas);
+    const spriteMat = new THREE.SpriteMaterial({ map: spriteTexture, transparent: true });
+    const tenSprite = new THREE.Sprite(spriteMat);
+    tenSprite.position.set(0, 10, 0); // Hovering 10 units above plane
+    tenSprite.scale.set(16, 16, 16);
+    planeGroup.add(tenSprite);
     
     planeMarker = planeGroup;
     planeMarker.scale.set(0.7, 0.7, 0.7);
@@ -444,24 +520,25 @@ function createFlightPath() {
     }
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
     
+    // Argentine flag + Gold particles mix
     const pColors = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount; i++) {
         const factor = Math.random();
-        if (factor < 0.45) { // Celeste
+        if (factor < 0.4) { // Celeste
             pColors[i * 3] = 0.45; pColors[i * 3 + 1] = 0.67; pColors[i * 3 + 2] = 0.87;
-        } else if (factor < 0.9) { // Blanco
+        } else if (factor < 0.75) { // Blanco
             pColors[i * 3] = 1.0; pColors[i * 3 + 1] = 1.0; pColors[i * 3 + 2] = 1.0;
-        } else { // Oro
-            pColors[i * 3] = 0.96; pColors[i * 3 + 1] = 0.7; pColors[i * 3 + 2] = 0.15;
+        } else { // Oro (Pulsing Gold energy for Messi)
+            pColors[i * 3] = 0.96; pColors[i * 3 + 1] = 0.70; pColors[i * 3 + 2] = 0.15;
         }
     }
     particleGeometry.setAttribute('color', new THREE.BufferAttribute(pColors, 3));
     
     const pMat = new THREE.PointsMaterial({
-        size: 2.2,
+        size: 2.5,
         vertexColors: true,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.85,
         blending: THREE.AdditiveBlending,
         sizeAttenuation: true
     });
@@ -516,28 +593,19 @@ function createAirportMarker(position, hexColor, label) {
 async function pollLiveFlightData() {
     try {
         const response = await fetch(CORS_PROXY + encodeURIComponent(OPENSKY_API_URL));
-        if (!response.ok) throw new Error("Network response was not ok");
+        if (!response.ok) throw new Error("API network response error");
         const data = await response.json();
         
-        // Check if states exist and are populated (meaning plane is active)
         if (data.states && data.states.length > 0) {
             const state = data.states[0];
-            
-            // OpenSky state vector values:
-            // state[1] = callsigh
-            // state[5] = longitude (lng)
-            // state[6] = latitude (lat)
-            // state[7] = baro_altitude (meters)
-            // state[9] = velocity (meters/s)
             const lng = state[5];
             const lat = state[6];
-            const altMeters = state[7] || 12496; // fallback to 41000 ft in meters
-            const velocityMs = state[9] || 250; // fallback to 900 km/h in m/s
+            const altMeters = state[7] || 12496;
+            const velocityMs = state[9] || 250;
             
             const altFeet = Math.round(altMeters * 3.28084);
             const speedKmh = Math.round(velocityMs * 3.6);
             
-            // Calculate progress mathematically based on current position relative to Miami and Rosario
             const startVec = latLngToVector3(MIAMI_COORDS.lat, MIAMI_COORDS.lng, GLOBE_RADIUS);
             const endVec = latLngToVector3(ROSARIO_COORDS.lat, ROSARIO_COORDS.lng, GLOBE_RADIUS);
             const currentVec = latLngToVector3(lat, lng, GLOBE_RADIUS);
@@ -555,32 +623,22 @@ async function pollLiveFlightData() {
             flightState.telemetry.altitude = altFeet;
             flightState.telemetry.speed = speedKmh;
             
-            // Enable visual live indicators
             statusDot.className = "status-dot live";
             statusText.className = "status-text live";
             statusText.innerText = "Transponder en Vivo (ADS-B)";
             
-            // Hide/Disable speed multipliers as they do not apply to live tracking
             document.querySelectorAll('.speed-btn').forEach(btn => btn.style.opacity = '0.3');
             speedBtn1.style.opacity = '1';
-            
-            console.log(`Live data updated: Lat ${lat}, Lng ${lng}, Alt ${altFeet}ft, Speed ${speedKmh}kmh, Progress ${(calculatedProgress*100).toFixed(2)}%`);
         } else {
-            // Plane is on the ground, run in simulated/playback mode
             if (flightState.liveMode) {
-                // If we were live and now lost signal, fall back
                 flightState.liveMode = false;
                 enableSimulationControls();
             }
-            
-            // Update status text to show it's simulated in real-time
             statusDot.className = "status-dot simulated";
             statusText.className = "status-text simulated";
             statusText.innerText = "En Tierra (Modo Simulado)";
         }
     } catch (err) {
-        console.warn("Unable to fetch live flight data (OpenSky). Running in simulated playback mode.", err);
-        // Ensure simulation mode is formatted correctly
         statusDot.className = "status-dot simulated";
         statusText.className = "status-text simulated";
         statusText.innerText = "En Tierra (Modo Simulado)";
@@ -593,7 +651,7 @@ function enableSimulationControls() {
 }
 
 // -------------------------------------------------------------
-// WEB AUDIO API - CINEMATIC SYNTHESIZER
+// WEB AUDIO API - CINEMATIC SEQUENCE & MELODY LOOP
 // -------------------------------------------------------------
 function initAudio() {
     if (audioCtx) return;
@@ -604,18 +662,20 @@ function initAudio() {
     masterGain.connect(audioCtx.destination);
     
     masterGain.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime + 2.0);
+    
     startAmbientChords();
+    startMelodySequence();
 }
 
 function startAmbientChords() {
     let tick = 0;
     
-    // Chord progression (Am - F - C - G) in slow cinematic rhythm
+    // Slow chords in A minor
     const progression = [
         [110, 164.81, 220, 261.63], // Am
-        [87.31, 130.81, 174.61, 220], // F
         [130.81, 196.00, 261.63, 329.63], // C
-        [98.00, 146.83, 196.00, 246.94]  // G
+        [98.00, 146.83, 196.00, 246.94], // G
+        [146.83, 220.00, 293.66, 349.23]  // Dm
     ];
     
     function playChord() {
@@ -624,7 +684,7 @@ function startAmbientChords() {
         const chordsIndex = tick % progression.length;
         const notes = progression[chordsIndex];
         const now = audioCtx.currentTime;
-        const duration = 6.0;
+        const duration = 7.5;
         
         notes.forEach((freq, index) => {
             const osc = audioCtx.createOscillator();
@@ -633,14 +693,14 @@ function startAmbientChords() {
             
             osc.type = index % 2 === 0 ? 'triangle' : 'sine';
             osc.frequency.setValueAtTime(freq, now);
-            osc.detune.setValueAtTime((Math.random() - 0.5) * 15, now);
+            osc.detune.setValueAtTime((Math.random() - 0.5) * 12, now);
             
             filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(400 + index * 100, now);
+            filter.frequency.setValueAtTime(350 + index * 100, now);
             filter.Q.setValueAtTime(1.0, now);
             
             oscGain.gain.setValueAtTime(0, now);
-            oscGain.gain.linearRampToValueAtTime(0.08, now + 1.5 + (index * 0.2));
+            oscGain.gain.linearRampToValueAtTime(0.09, now + 2.0);
             oscGain.gain.exponentialRampToValueAtTime(0.0001, now + duration - 0.2);
             
             osc.connect(oscGain);
@@ -650,40 +710,49 @@ function startAmbientChords() {
             osc.start(now);
             osc.stop(now + duration);
         });
-        
-        if (tick % 2 === 0) {
-            playHighArpeggio(notes, now);
-        }
         tick++;
     }
     
     playChord();
-    synthInterval = setInterval(playChord, 5500);
+    synthInterval = setInterval(playChord, 7000);
 }
 
-function playHighArpeggio(baseNotes, startTime) {
-    const now = startTime;
-    const highNotes = baseNotes.map(n => n * 4);
+function startMelodySequence() {
+    let currentNoteIndex = 0;
     
-    highNotes.forEach((freq, idx) => {
-        const delay = idx * 0.4;
+    function playNextMelodyNote() {
+        if (!isAudioPlaying) return;
+        
+        const noteObj = muchachosMelody[currentNoteIndex];
+        const freq = NOTE_FREQS[noteObj.note];
+        const duration = noteObj.dur * 1.5; // slow down slightly for epic space cinematic feel
+        
+        const now = audioCtx.currentTime;
+        
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
+        const filter = audioCtx.createBiquadFilter();
         
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + delay);
+        osc.type = 'sine'; // pure round whistle sound representing crowd singing
+        osc.frequency.setValueAtTime(freq, now);
         
-        gain.gain.setValueAtTime(0, now + delay);
-        gain.gain.linearRampToValueAtTime(0.015, now + delay + 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 1.2);
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1200, now);
         
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.035, now + 0.1); // subtle, soft lead
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration - 0.05);
+        
+        // Delay for stadium echo
         const delayNode = audioCtx.createDelay();
-        delayNode.delayTime.setValueAtTime(0.3, now);
+        delayNode.delayTime.setValueAtTime(0.45, now);
         
         const feedback = audioCtx.createGain();
         feedback.gain.setValueAtTime(0.4, now);
         
-        osc.connect(gain);
+        osc.connect(filter);
+        filter.connect(gain);
+        
         gain.connect(delayNode);
         delayNode.connect(feedback);
         feedback.connect(delayNode);
@@ -691,9 +760,16 @@ function playHighArpeggio(baseNotes, startTime) {
         gain.connect(masterGain);
         delayNode.connect(masterGain);
         
-        osc.start(now + delay);
-        osc.stop(now + delay + 2.0);
-    });
+        osc.start(now);
+        osc.stop(now + duration);
+        
+        currentNoteIndex = (currentNoteIndex + 1) % muchachosMelody.length;
+        
+        // Schedule next note precisely
+        melodyInterval = setTimeout(playNextMelodyNote, noteObj.dur * 1500);
+    }
+    
+    playNextMelodyNote();
 }
 
 function toggleAudio() {
@@ -703,6 +779,7 @@ function toggleAudio() {
             initAudio();
         } else {
             masterGain.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime + 1.0);
+            startMelodySequence();
         }
         audioBtn.classList.add('playing');
         audioBtn.innerHTML = `
@@ -714,7 +791,10 @@ function toggleAudio() {
     } else {
         isAudioPlaying = false;
         if (masterGain) {
-            masterGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 1.0);
+            masterGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 0.8);
+        }
+        if (melodyInterval) {
+            clearTimeout(melodyInterval);
         }
         audioBtn.classList.remove('playing');
         audioBtn.innerHTML = `
@@ -745,7 +825,6 @@ function updateTelemetry(progress, deltaTime) {
         }
     }
     
-    // Progress metrics
     const pct = Math.min(progress * 100, 100);
     progressBarFill.style.width = `${pct}%`;
     progressPercent.innerText = `${pct.toFixed(1)}%`;
@@ -753,12 +832,10 @@ function updateTelemetry(progress, deltaTime) {
     let currentSpeed, currentAlt, coords;
     
     if (flightState.liveMode) {
-        // Use live values fetched from transponder
         currentSpeed = flightState.telemetry.speed;
         currentAlt = flightState.telemetry.altitude;
         coords = { lat: flightState.telemetry.lat, lng: flightState.telemetry.lng };
     } else {
-        // Calculate simulated values
         const baseSpeed = 902;
         const speedDrift = Math.sin(Date.now() / 15000) * 12 + (Math.random() - 0.5) * 4;
         currentSpeed = Math.round(baseSpeed + speedDrift);
@@ -773,16 +850,13 @@ function updateTelemetry(progress, deltaTime) {
         }
         currentAlt = Math.round(altTemp);
         
-        // Find Lat/Lng from current 3D position
         const plane3DPos = planeMarker.position;
         coords = vector3ToLatLng(plane3DPos);
     }
     
-    // Distances
     const distTraveled = Math.min(FLIGHT_DISTANCE_KM * progress, FLIGHT_DISTANCE_KM);
     const distRemaining = Math.max(FLIGHT_DISTANCE_KM - distTraveled, 0);
     
-    // Times
     const totalDurationSecs = BASE_FLIGHT_DURATION_HOURS * 3600;
     const elapsedSecs = totalDurationSecs * progress;
     const remainingSecs = totalDurationSecs * (1 - progress);
@@ -793,7 +867,7 @@ function updateTelemetry(progress, deltaTime) {
         return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')} hs`;
     };
     
-    // Update DOM
+    // Update Standard DOM
     valLat.innerText = `${Math.abs(coords.lat).toFixed(4)}° ${coords.lat >= 0 ? 'N' : 'S'}`;
     valLng.innerText = `${Math.abs(coords.lng).toFixed(4)}° ${coords.lng >= 0 ? 'E' : 'W'}`;
     valSpeed.innerText = `${currentSpeed} km/h`;
@@ -802,17 +876,19 @@ function updateTelemetry(progress, deltaTime) {
     valDistRemaining.innerText = `${Math.round(distRemaining).toLocaleString()} km`;
     valElapsed.innerText = formatTime(elapsedSecs);
     valRemaining.innerText = formatTime(remainingSecs);
+    
+    // Update Mobile DOM elements
+    if (mValSpeed) mValSpeed.innerText = `${currentSpeed} km/h`;
+    if (mValAlt) mValAlt.innerText = `${currentAlt.toLocaleString()} pies`;
+    if (mValProg) mValProg.innerText = `${pct.toFixed(1)}%`;
 }
 
 // -------------------------------------------------------------
-// INTERACTION & BUTTON BINDINGS
+// INTERACTION & PANEL TOGGLE BINDINGS
 // -------------------------------------------------------------
 function setupInteraction() {
     playPauseBtn.addEventListener('click', () => {
-        if (flightState.liveMode) {
-            console.log("Play/Pause action disabled in live transponder mode.");
-            return;
-        }
+        if (flightState.liveMode) return;
         
         if (flightState.progress >= 1.0) {
             flightState.progress = 0.0;
@@ -854,8 +930,25 @@ function setupInteraction() {
     
     audioBtn.addEventListener('click', toggleAudio);
     
+    // Mobile panel sliding toggle
+    let panelsActive = false;
+    btnTogglePanels.addEventListener('click', () => {
+        panelsActive = !panelsActive;
+        if (panelsActive) {
+            telemetryAside.classList.add('active');
+            tributeAside.classList.add('active');
+            btnTogglePanels.innerText = "Ocultar Info";
+            btnTogglePanels.classList.add('btn-primary');
+        } else {
+            telemetryAside.classList.remove('active');
+            tributeAside.classList.remove('active');
+            btnTogglePanels.innerText = "Ver Info";
+            btnTogglePanels.classList.remove('btn-primary');
+        }
+    });
+    
     const changeSpeed = (multiplier) => {
-        if (flightState.liveMode) return; // ignore during live transponder tracking
+        if (flightState.liveMode) return;
         flightState.speedMultiplier = multiplier;
         updateSpeedControls();
     };
@@ -885,28 +978,23 @@ function animate(time) {
     const deltaTime = (time - lastTime) / 1000;
     lastTime = time;
     
-    // Slow planetary spin when not interacting
-    if (!controls.state === -1) {
-        earthMesh.rotation.y += 0.0008;
-        atmosphereMesh.rotation.y += 0.0008;
-    }
+    // Slow planetary spin
+    earthMesh.rotation.y += 0.0004;
+    atmosphereMesh.rotation.y += 0.0004;
     
+    // Update OrbitControls
     controls.update();
-    starsPoints.rotation.y += 0.00015;
+    starsPoints.rotation.y += 0.0001;
     
     let currentPoint;
     
     if (flightState.liveMode) {
-        // In Live Mode, the position is directly calculated from live Lat/Lng
         const planeGeoPos = latLngToVector3(flightState.telemetry.lat, flightState.telemetry.lng, GLOBE_RADIUS);
-        
-        // Find height of flight arc at this progress to match Three.js visual elevation
         const projectedProgressPoint = flightCurve.getPointAt(flightState.progress);
-        const arcHeight = projectedProgressPoint.length(); // distance from center of globe
+        const arcHeight = projectedProgressPoint.length();
         
         currentPoint = planeGeoPos.normalize().multiplyScalar(arcHeight);
     } else {
-        // In Simulation Mode, progress increases based on timer
         if (flightState.isPlaying) {
             const progressIncrement = (deltaTime / (BASE_FLIGHT_DURATION_HOURS * 3600)) * flightState.speedMultiplier;
             flightState.progress = Math.min(flightState.progress + progressIncrement, 1.0);
@@ -917,13 +1005,18 @@ function animate(time) {
     // Position plane model
     planeMarker.position.copy(currentPoint);
     
-    // Orient the airplane to align with the heading/direction
+    // -------------------------------------------------------------
+    // CRITICAL: CAMERA LOCK ON AIRPLANE POSITION
+    // -------------------------------------------------------------
+    // Interpolates controls target smoothly to keep the plane perfectly centered
+    controls.target.lerp(currentPoint, 0.08);
+    
+    // Orient the airplane model
     if (flightState.progress < 1.0) {
         flightTangent = flightCurve.getTangentAt(flightState.progress).normalize();
         const targetLook = currentPoint.clone().add(flightTangent);
         planeMarker.lookAt(targetLook);
         
-        // Stabilize wings
         const radialUp = currentPoint.clone().normalize();
         const localRight = new THREE.Vector3().crossVectors(flightTangent, radialUp).normalize();
         const orthogonalUp = new THREE.Vector3().crossVectors(localRight, flightTangent).normalize();
@@ -941,7 +1034,6 @@ function animate(time) {
 
 function updateTrailParticles(planePos) {
     const positions = particleGeometry.attributes.position.array;
-    
     const shouldUpdate = flightState.liveMode || (flightState.isPlaying && flightState.progress < 1.0);
     
     if (shouldUpdate && Math.random() > 0.4) {
@@ -951,7 +1043,7 @@ function updateTrailParticles(planePos) {
             positions[i * 3 + 2] = positions[(i - 1) * 3 + 2];
         }
         
-        const spread = 0.5;
+        const spread = 0.55;
         positions[0] = planePos.x + (Math.random() - 0.5) * spread;
         positions[1] = planePos.y + (Math.random() - 0.5) * spread;
         positions[2] = planePos.z + (Math.random() - 0.5) * spread;
