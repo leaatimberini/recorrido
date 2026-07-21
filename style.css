@@ -695,6 +695,10 @@ header.header-panel {
         font-size: 0.75rem;
     }
     
+    #btn-toggle-panels {
+        display: flex !important;
+    }
+    
     .speed-selector {
         padding: 2px;
     }
