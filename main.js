@@ -191,8 +191,8 @@ function setupThreeJS() {
     scene.add(globeGroup);
 
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1200);
-    // Position camera facing the Americas (Florida and Rosario are mapped on the negative X / negative Z hemisphere)
-    camera.position.set(-220, 50, -180);
+    // Position camera facing the Americas (Florida and Rosario are mapped on the positive X / positive Z hemisphere in standard formula)
+    camera.position.set(180, 50, 220);
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2x for mobile perf
@@ -381,12 +381,12 @@ function createFallbackTexture(mat) {
 // COORDINATE MATH
 // ═══════════════════════════════════════════════════════════════
 function latLngToVec3(lat, lng, radius) {
-    const latRad = lat * (Math.PI / 180);
-    const lngRad = lng * (Math.PI / 180);
+    const phi = lat * (Math.PI / 180);
+    const lambda = lng * (Math.PI / 180);
     return new THREE.Vector3(
-        radius * Math.cos(latRad) * Math.sin(lngRad),
-        radius * Math.sin(latRad),
-        -radius * Math.cos(latRad) * Math.cos(lngRad)
+        radius * Math.cos(phi) * Math.cos(lambda),
+        radius * Math.sin(phi),
+        -radius * Math.cos(phi) * Math.sin(lambda)
     );
 }
 
