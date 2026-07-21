@@ -57,6 +57,7 @@ const PARTICLE_COUNT = 250;
 let flightTangent = new THREE.Vector3();
 let cameraMode = 'global'; // 'global', 'cockpit', or 'satellite'
 let lastLoadedLat = 0, lastLoadedLng = 0;
+let satMap = null, satTileLayer = null;
 
 // Audio globals
 let audioCtx = null;
@@ -108,9 +109,14 @@ const DOM = {
     mValProg: $('m-val-prog'),
     // Satellite view
     satelliteContainer: $('satellite-container'),
-    satelliteIframe: $('satellite-iframe'),
     satHudCoords: $('sat-hud-coords'),
     satHudSector: $('sat-hud-sector'),
+    // Cockpit overlay
+    cockpitOverlay: $('cockpit-overlay'),
+    pfdSpeed: $('pfd-speed'),
+    pfdAlt: $('pfd-alt'),
+    pfdHdg: $('pfd-hdg'),
+    pfdProg: $('pfd-prog'),
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -482,48 +488,239 @@ function createAirportMarker(pos, color) {
 function buildAirplane() {
     const group = new THREE.Group();
 
-    // Fuselage
-    const fuseGeo = new THREE.ConeGeometry(1.6, 7.5, 8);
-    fuseGeo.rotateX(Math.PI / 2);
-    group.add(new THREE.Mesh(fuseGeo, new THREE.MeshStandardMaterial({
-        color: 0xffffff, roughness: 0.15, metalness: 0.85,
-        emissive: 0x74acdf, emissiveIntensity: 0.15
-    })));
+    // Materials
+    const shinyWhite = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.12,
+        metalness: 0.8,
+        name: 'fuselage'
+    });
+    
+    const darkGrey = new THREE.MeshStandardMaterial({
+        color: 0x1f2937,
+        roughness: 0.2,
+        metalness: 0.6,
+        name: 'details'
+    });
 
-    // Wings
+    const silverMetal = new THREE.MeshStandardMaterial({
+        color: 0xd1d5db,
+        roughness: 0.1,
+        metalness: 0.9,
+        name: 'engines'
+    });
+
+    const goldAccent = new THREE.MeshStandardMaterial({
+        color: 0xf6b426,
+        roughness: 0.15,
+        metalness: 0.9,
+        name: 'gold'
+    });
+
+    // 1. FUSELAGE (Cuerpo principal)
+    // Main cabin cylinder
+    const cabin = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.2, 1.2, 6.5, 16),
+        shinyWhite
+    );
+    cabin.rotateX(Math.PI / 2);
+    cabin.position.set(0, 0, 0.25);
+    group.add(cabin);
+
+    // Nose Cone (Pointy cockpit area)
+    const nose = new THREE.Mesh(
+        new THREE.ConeGeometry(1.2, 2.2, 16),
+        shinyWhite
+    );
+    nose.rotateX(Math.PI / 2);
+    nose.position.set(0, 0, 4.6);
+    group.add(nose);
+
+    // Cockpit Window Visor (Glossy windshield)
+    const visor = new THREE.Mesh(
+        new THREE.SphereGeometry(1.15, 8, 8, 0, Math.PI * 2, 0, Math.PI / 3),
+        new THREE.MeshStandardMaterial({ color: 0x050b14, roughness: 0.05, metalness: 0.95 })
+    );
+    visor.position.set(0, 0.35, 4.0);
+    visor.scale.set(1, 0.6, 1.3);
+    group.add(visor);
+
+    // Tail Cone (Rear tapering)
+    const tailCone = new THREE.Mesh(
+        new THREE.ConeGeometry(1.2, 3.0, 16),
+        shinyWhite
+    );
+    tailCone.rotateX(-Math.PI / 2);
+    tailCone.position.set(0, 0, -4.5);
+    group.add(tailCone);
+
+    // 2. WINGS (Alas swept-back)
+    const wingsGroup = new THREE.Group();
+    // Custom swept-back wings geometry
     const wingGeo = new THREE.BufferGeometry();
-    wingGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-        0, 0, 1.5,  -8, 0, -2.5,  8, 0, -2.5,  0, 0, -3.5
-    ]), 3));
-    wingGeo.setIndex([0, 1, 3, 0, 3, 2]);
+    const wingVerts = new Float32Array([
+        // Left Wing
+        0, -0.2, 1.8,
+        -8.2, -0.4, -3.2,
+        -8.2, -0.4, -2.6,
+        
+        0, -0.2, 1.8,
+        -8.2, -0.4, -2.6,
+        0, -0.2, -1.2,
+
+        // Right Wing
+        0, -0.2, 1.8,
+        8.2, -0.4, -2.6,
+        8.2, -0.4, -3.2,
+        
+        0, -0.2, 1.8,
+        0, -0.2, -1.2,
+        8.2, -0.4, -2.6
+    ]);
+    wingGeo.setAttribute('position', new THREE.BufferAttribute(wingVerts, 3));
     wingGeo.computeVertexNormals();
-    const wingMat = new THREE.MeshStandardMaterial({ color: 0xe0ebf6, roughness: 0.25, metalness: 0.75, side: THREE.DoubleSide });
-    group.add(new THREE.Mesh(wingGeo, wingMat));
+    const mainWings = new THREE.Mesh(wingGeo, new THREE.MeshStandardMaterial({
+        color: 0xf3f4f6, roughness: 0.18, metalness: 0.75, side: THREE.DoubleSide
+    }));
+    wingsGroup.add(mainWings);
 
-    // Tail
-    const tailGeo = new THREE.BufferGeometry();
-    tailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-        0, 0, -2,  0, 2.5, -3.5,  0, 0, -3.8
-    ]), 3));
-    tailGeo.setIndex([0, 1, 2]);
-    tailGeo.computeVertexNormals();
-    group.add(new THREE.Mesh(tailGeo, wingMat));
+    // Left Winglet (Bombardier signature winglet pointing up)
+    const leftWinglet = new THREE.Mesh(
+        new THREE.ConeGeometry(0.15, 1.0, 4),
+        goldAccent
+    );
+    leftWinglet.position.set(-8.2, 0.1, -2.9);
+    leftWinglet.rotation.set(0.1, 0, 0.3);
+    wingsGroup.add(leftWinglet);
 
-    // Engine glow
-    const engineLight = new THREE.PointLight(0xf6b426, 6, 20);
-    engineLight.position.set(0, 0, -4.5);
-    group.add(engineLight);
+    // Right Winglet
+    const rightWinglet = new THREE.Mesh(
+        new THREE.ConeGeometry(0.15, 1.0, 4),
+        goldAccent
+    );
+    rightWinglet.position.set(8.2, 0.1, -2.9);
+    rightWinglet.rotation.set(0.1, 0, -0.3);
+    wingsGroup.add(rightWinglet);
 
-    // Crown badge sprite
+    group.add(wingsGroup);
+
+    // 3. ENGINES (Turborreactores traseros laterales)
+    // Left Engine nacelle
+    const engineLeft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.48, 0.42, 2.0, 12),
+        shinyWhite
+    );
+    engineLeft.rotateX(Math.PI / 2);
+    engineLeft.position.set(-1.4, 0.5, -3.2);
+    group.add(engineLeft);
+
+    // Left Engine cowl/rim (silver intake)
+    const cowlLeft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.49, 0.49, 0.3, 12),
+        silverMetal
+    );
+    cowlLeft.rotateX(Math.PI / 2);
+    cowlLeft.position.set(-1.4, 0.5, -2.15);
+    group.add(cowlLeft);
+
+    // Left Engine nozzle (dark metallic exhaust)
+    const nozzleLeft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.35, 0.28, 0.4, 12),
+        darkGrey
+    );
+    nozzleLeft.rotateX(Math.PI / 2);
+    nozzleLeft.position.set(-1.4, 0.5, -4.35);
+    group.add(nozzleLeft);
+
+    // Right Engine nacelle
+    const engineRight = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.48, 0.42, 2.0, 12),
+        shinyWhite
+    );
+    engineRight.rotateX(Math.PI / 2);
+    engineRight.position.set(1.4, 0.5, -3.2);
+    group.add(engineRight);
+
+    // Right Engine cowl
+    const cowlRight = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.49, 0.49, 0.3, 12),
+        silverMetal
+    );
+    cowlRight.rotateX(Math.PI / 2);
+    cowlRight.position.set(1.4, 0.5, -2.15);
+    group.add(cowlRight);
+
+    // Right Engine nozzle
+    const nozzleRight = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.35, 0.28, 0.4, 12),
+        darkGrey
+    );
+    nozzleRight.rotateX(Math.PI / 2);
+    nozzleRight.position.set(1.4, 0.5, -4.35);
+    group.add(nozzleRight);
+
+    // 4. TAIL (Cola en T - Vertical and Horizontal Stabilizers)
+    const tailGroup = new THREE.Group();
+    // Vertical stabilizer (fin)
+    const finGeo = new THREE.BufferGeometry();
+    const finVerts = new Float32Array([
+        0, 0, -4.8,
+        0, 3.5, -6.6,
+        0, 3.5, -5.8,
+
+        0, 0, -4.8,
+        0, 3.5, -5.8,
+        0, 0, -5.8
+    ]);
+    finGeo.setAttribute('position', new THREE.BufferAttribute(finVerts, 3));
+    finGeo.computeVertexNormals();
+    const verticalFin = new THREE.Mesh(finGeo, shinyWhite);
+    tailGroup.add(verticalFin);
+
+    // Horizontal stabilizer (mounted at top of vertical fin)
+    const stabilizerGeo = new THREE.BufferGeometry();
+    const stabVerts = new Float32Array([
+        0, 3.5, -5.4,
+        -3.2, 3.5, -6.8,
+        -3.2, 3.5, -6.3,
+
+        0, 3.5, -5.4,
+        -3.2, 3.5, -6.3,
+        0, 3.5, -6.0,
+
+        0, 3.5, -5.4,
+        3.2, 3.5, -6.3,
+        3.2, 3.5, -6.8,
+
+        0, 3.5, -5.4,
+        0, 3.5, -6.0,
+        3.2, 3.5, -6.3
+    ]);
+    stabilizerGeo.setAttribute('position', new THREE.BufferAttribute(stabVerts, 3));
+    stabilizerGeo.computeVertexNormals();
+    const horizontalStab = new THREE.Mesh(stabilizerGeo, new THREE.MeshStandardMaterial({
+        color: 0xf3f4f6, roughness: 0.2, metalness: 0.7, side: THREE.DoubleSide
+    }));
+    tailGroup.add(horizontalStab);
+
+    group.add(tailGroup);
+
+    // Engine exhaust lights (emissive glow)
+    const leftEngineGlow = new THREE.PointLight(0xff5500, 4, 8);
+    leftEngineGlow.position.set(-1.4, 0.5, -4.6);
+    group.add(leftEngineGlow);
+
+    const rightEngineGlow = new THREE.PointLight(0xff5500, 4, 8);
+    rightEngineGlow.position.set(1.4, 0.5, -4.6);
+    group.add(rightEngineGlow);
+
+    // Messi crown badge
     const badge = document.createElement('canvas');
     badge.width = 128; badge.height = 128;
     const bCtx = badge.getContext('2d');
-
-    // Golden glow circle
     bCtx.fillStyle = 'rgba(246, 180, 38, 0.2)';
     bCtx.beginPath(); bCtx.arc(64, 64, 50, 0, Math.PI * 2); bCtx.fill();
     bCtx.strokeStyle = '#F6B426'; bCtx.lineWidth = 3; bCtx.stroke();
-
     bCtx.shadowColor = '#F6B426'; bCtx.shadowBlur = 15;
     bCtx.fillStyle = '#FFFFFF';
     bCtx.font = 'bold 36px Outfit, sans-serif';
@@ -537,13 +734,12 @@ function buildAirplane() {
         map: new THREE.CanvasTexture(badge),
         transparent: true
     }));
-    sprite.position.set(0, 12, 0);
-    sprite.scale.set(14, 14, 14);
+    sprite.position.set(0, 10, 0);
+    sprite.scale.set(12, 12, 12);
     group.add(sprite);
 
     planeMarker = group;
-    planeMarker.scale.set(0.7, 0.7, 0.7);
-    // Start at Miami
+    planeMarker.scale.set(0.65, 0.65, 0.65);
     planeMarker.position.copy(latLngToVec3(ORIGIN.lat, ORIGIN.lng, GLOBE_RADIUS));
     globeGroup.add(planeMarker);
 }
@@ -963,6 +1159,7 @@ function toggleCameraMode() {
         controls.enabled = false;
         
         DOM.hud.classList.remove('hidden');
+        DOM.cockpitOverlay.classList.remove('hidden');
         DOM.satelliteContainer.classList.add('hidden');
 
         planeMarker.add(camera);
@@ -974,6 +1171,7 @@ function toggleCameraMode() {
         DOM.cameraBtn.classList.add('playing');
         
         DOM.hud.classList.add('hidden');
+        DOM.cockpitOverlay.classList.add('hidden');
         DOM.satelliteContainer.classList.remove('hidden');
 
         scene.add(camera);
@@ -989,6 +1187,7 @@ function toggleCameraMode() {
         DOM.cameraBtn.classList.remove('playing');
         
         DOM.hud.classList.add('hidden');
+        DOM.cockpitOverlay.classList.add('hidden');
         DOM.satelliteContainer.classList.add('hidden');
 
         scene.add(camera);
@@ -1001,18 +1200,52 @@ function toggleCameraMode() {
     }
 }
 
+function initSatelliteMap() {
+    if (satMap) return;
+    try {
+        satMap = L.map('satellite-map', {
+            zoomControl: false,
+            attributionControl: false,
+            boxZoom: false,
+            doubleClickZoom: false,
+            dragging: false,
+            keyboard: false,
+            scrollWheelZoom: false,
+            touchZoom: false
+        }).setView([ORIGIN.lat, ORIGIN.lng], 9);
+
+        satTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19
+        }).addTo(satMap);
+    } catch (e) {
+        console.error("Leaflet initialization failed:", e);
+    }
+}
+
 function updateSatelliteIframe() {
     if (cameraMode !== 'satellite') return;
     
-    // Check if location shifted significantly to avoid constant iframe reloads
+    if (!satMap) {
+        initSatelliteMap();
+    }
+    
+    // Check if location shifted significantly to avoid constant updates
     const latDiff = Math.abs(state.lat - lastLoadedLat);
     const lngDiff = Math.abs(state.lng - lastLoadedLng);
     
     if (latDiff > 0.002 || lngDiff > 0.002) {
         lastLoadedLat = state.lat;
         lastLoadedLng = state.lng;
-        // Load Google Maps satellite embed
-        DOM.satelliteIframe.src = `https://maps.google.com/maps?q=${state.lat.toFixed(6)},${state.lng.toFixed(6)}&t=k&z=9&output=embed`;
+        if (satMap) {
+            satMap.setView([state.lat, state.lng], 10);
+            
+            // Rotate the map container based on plane's flight heading
+            const mapEl = document.getElementById('satellite-map');
+            if (mapEl) {
+                mapEl.style.transform = `scale(1.4) rotate(${-state.heading}deg)`;
+                mapEl.style.transition = "transform 1s ease";
+            }
+        }
     }
 }
 
@@ -1120,10 +1353,22 @@ function updateTelemetryUI() {
             DOM.hudSpeed.textContent = state.speed.toString().padStart(3, '0');
             DOM.hudAlt.textContent = state.altitude.toString().padStart(5, '0');
             DOM.hudHdg.textContent = `${Math.round(state.heading).toString().padStart(3, '0')}°`;
+
+            // Cockpit dashboard screens
+            const knots = Math.round(state.speed * 0.539957);
+            if (DOM.pfdSpeed) DOM.pfdSpeed.textContent = knots.toString();
+            if (DOM.pfdAlt) DOM.pfdAlt.textContent = state.altitude.toLocaleString();
+            if (DOM.pfdHdg) DOM.pfdHdg.textContent = `${Math.round(state.heading).toString().padStart(3, '0')}°`;
+            if (DOM.pfdProg) DOM.pfdProg.textContent = `${pct.toFixed(1)}%`;
         } else {
             DOM.hudSpeed.textContent = '000';
             DOM.hudAlt.textContent = '00000';
             DOM.hudHdg.textContent = '000°';
+
+            if (DOM.pfdSpeed) DOM.pfdSpeed.textContent = '000';
+            if (DOM.pfdAlt) DOM.pfdAlt.textContent = '00000';
+            if (DOM.pfdHdg) DOM.pfdHdg.textContent = '000°';
+            if (DOM.pfdProg) DOM.pfdProg.textContent = '0.0%';
         }
     }
 

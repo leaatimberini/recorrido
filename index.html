@@ -9,6 +9,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css?v=10">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
     <script type="importmap">
     {
@@ -23,9 +25,96 @@
     <!-- 3D Canvas -->
     <div id="canvas-container"></div>
 
-    <!-- Satellite Window View (Google Maps Satellite Embed) -->
+    <!-- Cockpit View (Cabina Frame & Instrument Panels) -->
+    <div id="cockpit-overlay" class="cockpit-overlay hidden">
+        <svg class="cockpit-frame" viewBox="0 0 1000 600" preserveAspectRatio="none">
+            <!-- Fullscreen frame cutouts for windshields (clockwise outer boundary, counter-clockwise inner cutouts) -->
+            <path d="M 0 0 L 1000 0 L 1000 600 L 0 600 Z 
+                     M 25 60 L 485 100 L 485 450 L 15 420 Z
+                     M 515 100 L 975 60 L 985 420 L 515 450 Z" 
+                  fill="#0b0f19" fill-rule="evenodd" />
+            <!-- Central windshield pillar -->
+            <rect x="485" y="0" width="30" height="450" fill="#060910" />
+            <!-- Glare Shield / Dashboard Ledge -->
+            <path d="M 0 420 L 485 450 L 515 450 L 1000 420 L 1000 600 L 0 600 Z" fill="#04060b" />
+            <!-- Glare Shield stitching/rim highlight -->
+            <path d="M 0 422 L 485 452 L 515 452 L 1000 422" stroke="#334155" stroke-width="2.5" fill="none" />
+        </svg>
+        
+        <!-- Live Glass Cockpit Flight Screens inside the Dashboard -->
+        <div class="cockpit-screens">
+            <!-- PFD - Primary Flight Display -->
+            <div class="flight-screen pfd">
+                <div class="screen-title">PFD - PRIMARY FLIGHT DATA</div>
+                <div class="screen-layout">
+                    <div class="screen-metric">
+                        <span class="label">SPD:</span>
+                        <span class="value val-green" id="pfd-speed">000</span> <span class="unit">kt</span>
+                    </div>
+                    <div class="screen-metric">
+                        <span class="label">ALT:</span>
+                        <span class="value val-green" id="pfd-alt">00000</span> <span class="unit">ft</span>
+                    </div>
+                </div>
+            </div>
+            <!-- MFD - Navigation and Route Info Display -->
+            <div class="flight-screen nd">
+                <div class="screen-title">MFD - NAVIGATION CONTROL</div>
+                <div class="screen-layout">
+                    <div class="screen-metric">
+                        <span class="label">HDG:</span>
+                        <span class="value val-blue" id="pfd-hdg">000°</span>
+                    </div>
+                    <div class="screen-metric">
+                        <span class="label">PROG:</span>
+                        <span class="value val-blue" id="pfd-prog">0.0%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Satellite Window View (Leaflet + Passenger Window & Wing) -->
     <div class="satellite-container hidden" id="satellite-container">
-        <iframe id="satellite-iframe" src="" style="border:0; width:100%; height:100%;" allowfullscreen="" loading="lazy"></iframe>
+        <div id="satellite-map" style="width:100%; height:100%; position:absolute; inset:0;"></div>
+        
+        <!-- Real-time Window Frame Overlay -->
+        <div class="passenger-window-overlay">
+            <svg class="window-svg-frame" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+                <!-- Leather Cabin wall with oval window cutout (clockwise outer, counter-clockwise inner) -->
+                <path d="M 0 0 L 1000 0 L 1000 1000 L 0 1000 Z 
+                         M 500 160 C 330 160 260 280 260 500 C 260 720 330 840 500 840 C 670 840 740 720 740 500 C 740 280 670 160 500 160 Z" 
+                      fill="#e2e8f0" fill-rule="evenodd" />
+                <!-- Double window bezels with shadow depth -->
+                <ellipse cx="500" cy="500" rx="240" ry="340" fill="none" stroke="#94a3b8" stroke-width="12" />
+                <ellipse cx="500" cy="500" rx="248" ry="348" fill="none" stroke="#cbd5e1" stroke-width="3" />
+                <ellipse cx="500" cy="500" rx="230" ry="330" fill="none" stroke="#475569" stroke-width="4" />
+            </svg>
+            <!-- 3D Wing Representation extending into the window view -->
+            <div class="airplane-wing">
+                <svg viewBox="0 0 500 500" class="wing-svg" style="width:100%; height:100%;">
+                    <!-- Swept-back silver wing of NetJets Global 6000 -->
+                    <path d="M 500 150 L 180 320 L 110 335 L 90 300 L 105 292 L 230 220 L 500 100 Z" fill="url(#wingGradient)" stroke="#94a3b8" stroke-width="1.5" />
+                    <!-- Flaps outline -->
+                    <path d="M 460 148 L 220 236 L 105 292" stroke="#64748b" stroke-width="1.5" fill="none" />
+                    <!-- Golden winglet curving up -->
+                    <path d="M 90 300 L 85 240 L 100 245 L 105 292 Z" fill="#f6b426" stroke="#d59416" stroke-width="1" />
+                    <!-- Flashing red wingtip nav light -->
+                    <circle cx="92" cy="255" r="4.5" fill="#ef4444" class="wing-light-flash" />
+                    
+                    <defs>
+                        <linearGradient id="wingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#ffffff" />
+                            <stop offset="70%" stop-color="#cbd5e1" />
+                            <stop offset="100%" stop-color="#64748b" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <!-- Glass glare overlay -->
+            <div class="glass-glare"></div>
+        </div>
+
         <div class="satellite-hud-overlay">
             <div class="hud-line">VISTA VENTANILLA EN VIVO ✈️</div>
             <div class="hud-line">SECTOR: <span id="sat-hud-sector">MAR CARIBE</span></div>

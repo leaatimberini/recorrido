@@ -682,7 +682,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════
-   SATELLITE WINDOW VIEW
+   SATELLITE / VENTANILLA WINDOW VIEW
    ═══════════════════════════════════════════════════════ */
 .satellite-container {
     position: fixed;
@@ -690,6 +690,7 @@ html, body {
     z-index: 1; /* directly above canvas-container (z-index 0) */
     background: #000;
     transition: opacity 0.5s ease, visibility 0.5s ease;
+    overflow: hidden;
 }
 
 .satellite-container.hidden {
@@ -721,10 +722,185 @@ html, body {
     font-weight: 700;
 }
 
+/* ═══════════════════════════════════════════════════════
+   PASSENGER WINDOW OVERLAY
+   ═══════════════════════════════════════════════════════ */
+.passenger-window-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.window-svg-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 4;
+}
+
+.airplane-wing {
+    position: absolute;
+    width: min(480px, 48vw);
+    height: min(480px, 48vw);
+    /* Align with center oval opening */
+    left: 50%;
+    top: 50%;
+    transform: translate(-92%, -38%) rotate(-2deg);
+    z-index: 2;
+}
+
+.wing-light-flash {
+    animation: wing-light-blink 1.2s infinite ease-in-out;
+}
+
+@keyframes wing-light-blink {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; fill: #ff3333; filter: drop-shadow(0 0 8px #ff3333); }
+}
+
+.glass-glare {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(480px, 48vw);
+    height: min(680px, 68vw);
+    border-radius: 240px / 340px; /* matches SVG oval scale */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.01) 50%, transparent 51%, transparent 100%);
+    z-index: 3;
+}
+
+/* ═══════════════════════════════════════════════════════
+   COCKPIT HUD & INSTRUMENTS
+   ═══════════════════════════════════════════════════════ */
+.cockpit-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2; /* directly above canvas-container (z-index 0) */
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.cockpit-overlay.hidden {
+    display: none;
+}
+
+.cockpit-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+.cockpit-screens {
+    position: absolute;
+    bottom: 80px; /* above the footer dashboard controls */
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(800px, 95vw);
+    height: 110px;
+    z-index: 5;
+    display: flex;
+    justify-content: space-between;
+    gap: 30px;
+    padding: 0 10px;
+}
+
+.flight-screen {
+    flex: 1;
+    background: rgba(8, 12, 24, 0.95);
+    border: 2px solid #334155;
+    box-shadow: inset 0 0 20px rgba(0, 230, 118, 0.15), 0 10px 25px rgba(0,0,0,0.8);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-family: monospace;
+}
+
+.flight-screen .screen-title {
+    font-size: 0.65rem;
+    color: #64748b;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.screen-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 4px;
+}
+
+.screen-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.screen-metric .label {
+    color: #94a3b8;
+}
+
+.screen-metric .value {
+    font-weight: 700;
+    font-size: 1.0rem;
+}
+
+.screen-metric .unit {
+    font-size: 0.7rem;
+    color: #475569;
+    margin-left: 2px;
+}
+
+.val-green {
+    color: #00e676;
+    text-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
+}
+
+.val-blue {
+    color: #29b6f6;
+    text-shadow: 0 0 8px rgba(41, 182, 246, 0.4);
+}
+
 @media (max-width: 768px) {
     .satellite-hud-overlay {
         top: 110px;
         left: 10px;
         font-size: 0.72rem;
+    }
+    .cockpit-screens {
+        bottom: 110px; /* Adjust for mobile footer */
+        height: 65px;
+        gap: 10px;
+    }
+    .flight-screen {
+        padding: 4px 6px;
+    }
+    .flight-screen .screen-title {
+        font-size: 0.5rem;
+        padding-bottom: 2px;
+    }
+    .screen-layout {
+        gap: 2px;
+    }
+    .screen-metric {
+        font-size: 0.65rem;
+    }
+    .screen-metric .value {
+        font-size: 0.7rem;
     }
 }
