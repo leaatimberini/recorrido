@@ -18,7 +18,8 @@ const POLL_INTERVAL_MS = 12000;
 // Known departure time from FlightAware: 2026-07-21T01:00Z from KFLL
 const KNOWN_DEPARTURE_UTC = new Date('2026-07-21T01:00:00Z').getTime();
 
-// Data sources — adsb.lol is free & CORS-friendly (primary), OpenSky as fallback
+// Data sources — airplanes.live has best coverage (primary), adsb.lol as fallback, OpenSky as tertiary
+const AIRPLANES_LIVE_URL = `https://api.airplanes.live/v2/icao/${ICAO24}`;
 const ADSB_LOL_URL = `https://api.adsb.lol/v2/icao/${ICAO24}`;
 const OPENSKY_URL = `https://opensky-network.org/api/states/all?icao24=${ICAO24}`;
 
@@ -396,6 +397,13 @@ function latLngToVec3(lat, lng, radius) {
     );
 }
 
+function vec3ToLatLng(vec) {
+    const radius = vec.length();
+    const lat = Math.asin(vec.y / radius) * (180 / Math.PI);
+    const lng = Math.atan2(-vec.z, vec.x) * (180 / Math.PI);
+    return { lat, lng };
+}
+
 // ═══════════════════════════════════════════════════════════════
 // FLIGHT PATH, MARKERS, AIRPLANE
 // ═══════════════════════════════════════════════════════════════
@@ -578,8 +586,10 @@ let currentProxyIndex = 0;
 async function pollFlight() {
     countdownValue = 12; // Reset countdown
 
-    // Source 1: adsb.lol (direct, no CORS issues)
-    const liveData = await tryAdsbLol() || await tryOpenSky();
+    // Source 1: airplanes.live (direct, excellent coverage)
+    // Source 2: adsb.lol (direct, fallback)
+    // Source 3: OpenSky (proxies, secondary fallback)
+    const liveData = await tryAirplanesLive() || await tryAdsbLol() || await tryOpenSky();
 
     if (liveData) {
         applyLiveData(liveData);
@@ -587,6 +597,35 @@ async function pollFlight() {
         // No ADS-B coverage — use estimated position if flight has departed
         handleNoSignal();
     }
+}
+
+async function tryAirplanesLive() {
+    try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const resp = await fetch(AIRPLANES_LIVE_URL, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (!resp.ok) return null;
+        const data = await resp.json();
+
+        if (data.ac && data.ac.length > 0) {
+            const ac = data.ac[0];
+            if (ac.lat && ac.lon) {
+                console.log('[airplanes.live] Got live data');
+                return {
+                    lat: ac.lat,
+                    lng: ac.lon,
+                    altitude: ac.alt_baro || ac.alt_geom || 0, // feet
+                    speed: Math.round((ac.gs || 0) * 1.852),    // knots → km/h
+                    heading: ac.track || ac.true_heading || 0,
+                    source: 'airplanes.live'
+                };
+            }
+        }
+    } catch (e) {
+        console.warn('[airplanes.live] failed:', e.message);
+    }
+    return null;
 }
 
 async function tryAdsbLol() {
@@ -695,12 +734,14 @@ function handleNoSignal() {
         const estimatedProgress = Math.min(elapsed / totalFlightMs, 0.99);
         state.progress = estimatedProgress;
 
-        // Interpolate lat/lng along great circle
-        const t = estimatedProgress;
-        state.lat = ORIGIN.lat + (DESTINATION.lat - ORIGIN.lat) * t;
-        state.lng = ORIGIN.lng + (DESTINATION.lng - ORIGIN.lng) * t;
-        state.altitude = t < 0.05 ? Math.round(41000 * (t / 0.05))
-                       : t > 0.95 ? Math.round(41000 * ((1 - t) / 0.05))
+        // Interpolate lat/lng along Bezier curve (high precision track)
+        const curvePoint = flightCurve.getPointAt(estimatedProgress);
+        const geo = vec3ToLatLng(curvePoint);
+        state.lat = geo.lat;
+        state.lng = geo.lng;
+        
+        state.altitude = estimatedProgress < 0.05 ? Math.round(41000 * (estimatedProgress / 0.05))
+                       : estimatedProgress > 0.95 ? Math.round(41000 * ((1 - estimatedProgress) / 0.05))
                        : 41000;
         state.speed = 902; // Cruise speed estimate
 
