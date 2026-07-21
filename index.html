@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vuelo N142QS - El Retorno de Lionel Messi | Recorrido en Vivo</title>
+    <meta name="description" content="Sigue en tiempo real el vuelo de Lionel Messi de regreso a Rosario, Argentina, tras el mundial. Un tributo interactivo en 3D con Three.js.">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Import Map for ES Modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay Panels -->
+    <div class="ui-overlay">
+        
+        <!-- HEADER -->
+        <header class="interactive-panel header-panel" id="main-header">
+            <div class="brand">
+                <span class="badge-vuelo">Vuelo N142QS</span>
+                <h1>El Retorno del <span>10</span></h1>
+            </div>
+            <div class="header-status">
+                <span class="status-dot"></span>
+                <span class="status-text">En Ruta</span>
+            </div>
+        </header>
+
+        <!-- Tooltip Instructions -->
+        <div class="instructions-overlay">
+            Arrastra para rotar la Tierra • Rueda para Zoom • Clic en controles para simular
+        </div>
+
+        <!-- LEFT PANEL - TELEMETRIA -->
+        <aside class="interactive-panel telemetry-panel" id="telemetry-aside">
+            <div class="section-title">Telemetría de Vuelo</div>
+            
+            <div class="route-container">
+                <div class="route-node">
+                    <div class="iata">MIA</div>
+                    <div class="city">Miami, EE.UU.</div>
+                </div>
+                <div class="route-arrow">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M21,16V14L13,9V3.5A1.5,1.5 0 0,0 11.5,2A1.5,1.5 0 0,0 10,3.5V9L2,14V16L10,13.5V19L8,20.5V22L11.5,21L15,22V20.5L13,19V13.5L21,16Z"/>
+                    </svg>
+                    <span style="font-size:0.6rem;letter-spacing:1px;text-transform:uppercase;margin-top:2px;">Ruta Geodésica</span>
+                </div>
+                <div class="route-node">
+                    <div class="iata">ROS</div>
+                    <div class="city">Rosario, ARG</div>
+                </div>
+            </div>
+
+            <div class="telemetry-grid">
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Latitud</span>
+                    <span class="telemetry-value highlight-celeste" id="val-lat">--</span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Longitud</span>
+                    <span class="telemetry-value highlight-celeste" id="val-lng">--</span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Velocidad</span>
+                    <span class="telemetry-value" id="val-speed">--</span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Altitud</span>
+                    <span class="telemetry-value" id="val-alt">--</span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Dist. Recorrida</span>
+                    <span class="telemetry-value" id="val-dist-traveled">--</span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Dist. Restante</span>
+                    <span class="telemetry-value" id="val-dist-remaining">--</span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Tiempo Transc.</span>
+                    <span class="telemetry-value" id="val-elapsed">--</span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">Tiempo Restante</span>
+                    <span class="telemetry-value" id="val-remaining">--</span>
+                </div>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-info">
+                    <span>Progreso del Recorrido</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- RIGHT PANEL - HOMENAJE -->
+        <aside class="interactive-panel tribute-panel" id="tribute-aside">
+            <div class="section-title">La Gloria es Eterna</div>
+            
+            <p class="tribute-text">
+                Tras finalizar un épico Mundial 2026 como subcampeones mundiales, Lionel Messi y su familia vuelan de regreso a casa. Aunque el bicampeonato no se concretó, el orgullo de toda una nación es inquebrantable. Rosario y toda la Argentina esperan al capitán para abrazarlo una vez más.
+            </p>
+
+            <blockquote class="messi-quote">
+                "No hay nada más lindo que estar en Argentina, el cariño de la gente no se compara con nada. Dimos todo hasta el final."
+            </blockquote>
+
+            <div class="section-title" style="margin-top: 10px;">Trayectoria del Capitán</div>
+
+            <div class="timeline">
+                <div class="timeline-item">
+                    <span class="timeline-dot"></span>
+                    <div class="timeline-date">2005 - Debut Oficial</div>
+                    <div class="timeline-desc">Comienza la leyenda vistiendo la camiseta albiceleste.</div>
+                </div>
+                <div class="timeline-item">
+                    <span class="timeline-dot"></span>
+                    <div class="timeline-date">2021 - Copa América</div>
+                    <div class="timeline-desc">Consagración en el Maracaná ante Brasil, rompiendo la sequía.</div>
+                </div>
+                <div class="timeline-item">
+                    <span class="timeline-dot"></span>
+                    <div class="timeline-date">2022 - Copa del Mundo</div>
+                    <div class="timeline-desc">Campeón mundial en Qatar, bordando la tercera estrella en el pecho.</div>
+                </div>
+                <div class="timeline-item">
+                    <span class="timeline-dot highlight"></span>
+                    <div class="timeline-date">2026 - Subcampeón Mundial</div>
+                    <div class="timeline-desc">El último baile mundialista en Norteamérica, liderando con grandeza.</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- BOTTOM PANEL - CONTROLES -->
+        <footer class="interactive-panel control-panel" id="controls-footer">
+            <div class="control-group">
+                <button class="btn btn-primary" id="play-pause">
+                    <svg style="width:16px;height:16px;fill:currentColor" viewBox="0 0 24 24">
+                        <path d="M14,19H18V5H14M6,19H10V5H6V19Z"/>
+                    </svg>
+                    Pausar Vuelo
+                </button>
+                <button class="btn btn-audio" id="btn-audio">
+                    <svg style="width:16px;height:16px;fill:currentColor" viewBox="0 0 24 24">
+                        <path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.85 14,18.71V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.77 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/>
+                    </svg>
+                    Activar Sonido
+                </button>
+            </div>
+
+            <div class="control-group">
+                <span style="font-size:0.75rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.8px;">Velocidad de Simulación:</span>
+                <div class="speed-selector">
+                    <button class="speed-btn" id="speed-1">x1</button>
+                    <button class="speed-btn" id="speed-10">x10</button>
+                    <button class="speed-btn active" id="speed-100">x100</button>
+                    <button class="speed-btn" id="speed-1000">x1000</button>
+                </div>
+            </div>
+
+            <div class="vancouver-credit">
+                Desarrollado con 💙 y 🤍 por <a href="https://github.com/leaatimberini" target="_blank">leaatimberini</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Main Entry Module -->
+    <script type="module" src="main.js"></script>
+</body>
+</html>
