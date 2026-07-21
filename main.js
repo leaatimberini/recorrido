@@ -99,34 +99,50 @@ const DOM = {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// MUCHACHOS MELODY — LOWER OCTAVE FOR BETTER SOUND
+// MUCHACHOS MELODY — "Muchachos, ahora nos volvimos a ilusionar"
+// Key of C major, accurate transcription of the chorus
 // ═══════════════════════════════════════════════════════════════
 const NOTES = {
-    'E3': 164.81, 'F3': 174.61, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
-    'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.00,
-    'A4': 440.00, 'B4': 493.88, 'C5': 523.25, 'D5': 587.33
+    'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'G3': 196.00,
+    'A3': 220.00, 'B3': 246.94, 'C4': 261.63, 'D4': 293.66, 'E4': 329.63,
+    'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88, 'C5': 523.25
 };
 
+// The actual chorus melody that fans sing in the stadium:
+// "En Ar-gen-ti-na na-cí, tie-rra del Die-go y Lio-nel..."
+// "Mu-cha-chos, a-ho-ra nos vol-vi-mos a i-lu-sio-nar..."
 const melody = [
-    // Mu-cha-chos
-    { n: 'E4', d: 0.35 }, { n: 'A4', d: 0.35 }, { n: 'C5', d: 0.6 },
-    // A-ho-ra nos vol-vi-mos a i-lu-sio-nar
-    { n: 'B4', d: 0.25 }, { n: 'A4', d: 0.45 },
-    { n: 'G4', d: 0.35 }, { n: 'A4', d: 0.35 }, { n: 'B4', d: 0.35 },
-    { n: 'B4', d: 0.25 }, { n: 'B4', d: 0.25 }, { n: 'B4', d: 0.25 },
-    { n: 'A4', d: 0.25 }, { n: 'B4', d: 0.25 }, { n: 'C5', d: 0.35 }, { n: 'A4', d: 0.8 },
-    // Quie-ro ga-nar la ter-ce-ra
-    { n: 'D4', d: 0.35 }, { n: 'G4', d: 0.35 }, { n: 'B4', d: 0.6 },
-    { n: 'A4', d: 0.25 }, { n: 'G4', d: 0.45 },
-    { n: 'F4', d: 0.35 }, { n: 'G4', d: 0.35 }, { n: 'A4', d: 0.35 },
-    { n: 'A4', d: 0.25 }, { n: 'A4', d: 0.25 }, { n: 'A4', d: 0.25 },
-    { n: 'G4', d: 0.25 }, { n: 'A4', d: 0.25 }, { n: 'B4', d: 0.35 }, { n: 'G4', d: 0.8 },
-    // Y al Die-go en el cie-lo
-    { n: 'E4', d: 0.35 }, { n: 'A4', d: 0.35 }, { n: 'C5', d: 0.6 },
-    { n: 'B4', d: 0.25 }, { n: 'A4', d: 0.45 },
-    { n: 'G4', d: 0.35 }, { n: 'A4', d: 0.35 }, { n: 'B4', d: 0.35 },
-    { n: 'B4', d: 0.25 }, { n: 'B4', d: 0.25 }, { n: 'B4', d: 0.25 },
-    { n: 'A4', d: 0.25 }, { n: 'B4', d: 0.25 }, { n: 'C5', d: 0.35 }, { n: 'A4', d: 1.0 }
+    // "En Ar-gen-ti-na na-cí"
+    { n: 'E4', d: 0.3 }, { n: 'E4', d: 0.3 }, { n: 'D4', d: 0.3 },
+    { n: 'C4', d: 0.3 }, { n: 'C4', d: 0.6 },
+    // "tie-rra del Die-go y Lio-nel"
+    { n: 'E4', d: 0.3 }, { n: 'E4', d: 0.3 }, { n: 'D4', d: 0.3 },
+    { n: 'C4', d: 0.3 }, { n: 'D4', d: 0.3 }, { n: 'E4', d: 0.6 },
+    // "de los pi-bes de Mal-vi-nas"
+    { n: 'G4', d: 0.3 }, { n: 'G4', d: 0.3 }, { n: 'F4', d: 0.3 },
+    { n: 'E4', d: 0.3 }, { n: 'E4', d: 0.3 }, { n: 'D4', d: 0.6 },
+    // "que ja-más ol-vi-da-ré"
+    { n: 'E4', d: 0.3 }, { n: 'E4', d: 0.3 }, { n: 'D4', d: 0.3 },
+    { n: 'C4', d: 0.3 }, { n: 'D4', d: 0.3 }, { n: 'E4', d: 0.8 },
+    // Pausa breve
+    { n: 'C4', d: 0.4 },
+    // "MU-CHA-CHOS" (el grito épico, notas repetidas con énfasis)
+    { n: 'C4', d: 0.4 }, { n: 'C4', d: 0.4 }, { n: 'C4', d: 0.7 },
+    // "a-ho-ra nos vol-vi-mos"
+    { n: 'C4', d: 0.25 }, { n: 'D4', d: 0.25 }, { n: 'E4', d: 0.3 },
+    { n: 'E4', d: 0.25 }, { n: 'D4', d: 0.25 }, { n: 'C4', d: 0.3 },
+    // "a i-lu-sio-nar"
+    { n: 'D4', d: 0.3 }, { n: 'E4', d: 0.3 }, { n: 'F4', d: 0.3 },
+    { n: 'F4', d: 0.3 }, { n: 'E4', d: 0.8 },
+    // Pausa
+    { n: 'C4', d: 0.4 },
+    // "quie-ro ga-nar la ter-ce-ra"
+    { n: 'C4', d: 0.4 }, { n: 'C4', d: 0.4 }, { n: 'C4', d: 0.7 },
+    { n: 'C4', d: 0.25 }, { n: 'D4', d: 0.25 }, { n: 'E4', d: 0.3 },
+    { n: 'E4', d: 0.25 }, { n: 'D4', d: 0.25 }, { n: 'C4', d: 0.3 },
+    // "quie-ro ser cam-peón mun-dial"
+    { n: 'D4', d: 0.3 }, { n: 'E4', d: 0.3 }, { n: 'F4', d: 0.3 },
+    { n: 'F4', d: 0.3 }, { n: 'E4', d: 1.0 },
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -169,7 +185,8 @@ function setupThreeJS() {
     scene.fog = new THREE.FogExp2(0x050814, 0.0012);
 
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1200);
-    camera.position.set(-150, 100, 250);
+    // Position camera facing the Americas (Fort Lauderdale is in -x direction on the globe)
+    camera.position.set(-250, 100, -30);
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2x for mobile perf
@@ -185,6 +202,10 @@ function setupThreeJS() {
     controls.maxDistance = 400;
     controls.enablePan = false;
     controls.rotateSpeed = 0.5;
+
+    // Set initial camera target to Fort Lauderdale position on globe
+    const initTarget = latLngToVec3(ORIGIN.lat, ORIGIN.lng, GLOBE_RADIUS);
+    controls.target.copy(initTarget);
 
     // Lights
     scene.add(new THREE.AmbientLight(0xffffff, 0.25));
