@@ -48,10 +48,11 @@ const state = {
 
 // Three.js globals
 let scene, camera, renderer, controls;
-let earthMesh, atmosphereMesh, starsPoints;
+let globeGroup;
+let earthMesh, atmosphereMesh, cloudsMesh, starsPoints;
 let flightCurve, flightLine, planeMarker;
 let particleGeometry, particlePositions;
-const PARTICLE_COUNT = 200;
+const PARTICLE_COUNT = 250;
 let flightTangent = new THREE.Vector3();
 
 // Audio globals
@@ -77,7 +78,8 @@ const DOM = {
     statusDot: $('status-dot'),
     statusText: $('status-text'),
     audioBtn: $('btn-audio'),
-    toggleBtn: $('btn-toggle-panels'),
+    toggleTelemetryBtn: $('btn-toggle-telemetry'),
+    toggleTributeBtn: $('btn-toggle-tribute'),
     telemetryPanel: $('telemetry-aside'),
     tributePanel: $('tribute-aside'),
     instructionsTip: $('instructions-tip'),
@@ -184,6 +186,10 @@ function setupThreeJS() {
     scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x050814, 0.0012);
 
+    // Group that contains all rotating globe elements together
+    globeGroup = new THREE.Group();
+    scene.add(globeGroup);
+
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1200);
     // Position camera facing the Americas (Fort Lauderdale is in -x direction on the globe)
     camera.position.set(-250, 100, -30);
@@ -275,9 +281,10 @@ function createGlobe() {
     const loader = new THREE.TextureLoader();
 
     const mat = new THREE.MeshStandardMaterial({
-        color: 0x111625,
-        roughness: 0.8,
-        metalness: 0.1,
+        color: 0x0a0f1d,
+        roughness: 0.7,
+        metalness: 0.25,
+        bumpScale: 1.0
     });
 
     loader.load('https://unpkg.com/three-globe/example/img/earth-night.jpg',
@@ -287,11 +294,23 @@ function createGlobe() {
     );
 
     loader.load('https://unpkg.com/three-globe/example/img/earth-topology.png',
-        tex => { mat.bumpMap = tex; mat.bumpScale = 1.5; mat.needsUpdate = true; }
+        tex => { mat.bumpMap = tex; mat.bumpScale = 1.2; mat.needsUpdate = true; }
     );
 
     earthMesh = new THREE.Mesh(geo, mat);
-    scene.add(earthMesh);
+    globeGroup.add(earthMesh);
+
+    // Add Clouds Layer for Premium Quality
+    const cloudsGeo = new THREE.SphereGeometry(GLOBE_RADIUS * 1.006, 64, 64);
+    const cloudsMat = new THREE.MeshStandardMaterial({
+        alphaMap: loader.load('https://unpkg.com/three-globe/example/img/earth-clouds.png'),
+        transparent: true,
+        opacity: 0.35,
+        blending: THREE.AdditiveBlending,
+        color: 0xffffff
+    });
+    cloudsMesh = new THREE.Mesh(cloudsGeo, cloudsMat);
+    globeGroup.add(cloudsMesh);
 
     // Atmosphere shader
     const atmosGeo = new THREE.SphereGeometry(GLOBE_RADIUS * 1.015, 64, 64);
@@ -313,7 +332,7 @@ function createGlobe() {
         transparent: true
     });
     atmosphereMesh = new THREE.Mesh(atmosGeo, atmosMat);
-    scene.add(atmosphereMesh);
+    globeGroup.add(atmosphereMesh);
 }
 
 function createFallbackTexture(mat) {
@@ -396,7 +415,7 @@ function createFlightPath() {
         new THREE.BufferGeometry().setFromPoints(pts),
         new THREE.LineBasicMaterial({ color: 0x74acdf, transparent: true, opacity: 0.55 })
     );
-    scene.add(flightLine);
+    globeGroup.add(flightLine);
 
     // Airport markers
     createAirportMarker(startV, 0x74acdf);
@@ -437,7 +456,7 @@ function createAirportMarker(pos, color) {
     dot.position.copy(pos.clone().addScaledVector(dir, 12));
     group.add(dot);
 
-    scene.add(group);
+    globeGroup.add(group);
 }
 
 function buildAirplane() {
@@ -506,7 +525,7 @@ function buildAirplane() {
     planeMarker.scale.set(0.7, 0.7, 0.7);
     // Start at Miami
     planeMarker.position.copy(latLngToVec3(ORIGIN.lat, ORIGIN.lng, GLOBE_RADIUS));
-    scene.add(planeMarker);
+    globeGroup.add(planeMarker);
 }
 
 function buildTrailParticles(startVec) {
@@ -532,8 +551,8 @@ function buildTrailParticles(startVec) {
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
     particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    scene.add(new THREE.Points(particleGeometry, new THREE.PointsMaterial({
-        size: 2.2,
+    globeGroup.add(new THREE.Points(particleGeometry, new THREE.PointsMaterial({
+        size: 2.5,
         vertexColors: true,
         transparent: true,
         opacity: 0.8,
@@ -889,20 +908,37 @@ function toggleAudio() {
 function setupEventListeners() {
     DOM.audioBtn.addEventListener('click', toggleAudio);
 
-    // Mobile panel toggle
-    let panelsOpen = false;
-    DOM.toggleBtn.addEventListener('click', () => {
-        panelsOpen = !panelsOpen;
-        if (panelsOpen) {
+    // Mobile panel toggles
+    let telemetryActive = false;
+    let tributeActive = false;
+
+    DOM.toggleTelemetryBtn.addEventListener('click', () => {
+        telemetryActive = !telemetryActive;
+        tributeActive = false; // Always close the other panel to prevent overlapping
+
+        if (telemetryActive) {
             DOM.telemetryPanel.classList.add('active');
-            DOM.tributePanel.classList.add('active');
-            DOM.toggleBtn.textContent = 'Ocultar Info';
-            DOM.toggleBtn.classList.add('playing');
+            DOM.tributePanel.classList.remove('active');
+            DOM.toggleTelemetryBtn.classList.add('active');
+            DOM.toggleTributeBtn.classList.remove('active');
         } else {
             DOM.telemetryPanel.classList.remove('active');
+            DOM.toggleTelemetryBtn.classList.remove('active');
+        }
+    });
+
+    DOM.toggleTributeBtn.addEventListener('click', () => {
+        tributeActive = !tributeActive;
+        telemetryActive = false; // Always close the other panel to prevent overlapping
+
+        if (tributeActive) {
+            DOM.tributePanel.classList.add('active');
+            DOM.telemetryPanel.classList.remove('active');
+            DOM.toggleTributeBtn.classList.add('active');
+            DOM.toggleTelemetryBtn.classList.remove('active');
+        } else {
             DOM.tributePanel.classList.remove('active');
-            DOM.toggleBtn.textContent = 'Ver Info';
-            DOM.toggleBtn.classList.remove('playing');
+            DOM.toggleTributeBtn.classList.remove('active');
         }
     });
 }
@@ -975,12 +1011,18 @@ function formatTime(secs) {
 function animate() {
     requestAnimationFrame(animate);
 
-    // Slow globe rotation
-    earthMesh.rotation.y += 0.0003;
-    atmosphereMesh.rotation.y += 0.0003;
-    starsPoints.rotation.y += 0.0001;
+    // Slow globe group rotation (rotates Earth, clouds, path, airplane together)
+    globeGroup.rotation.y += 0.00025;
+    
+    // Parallax effect: Clouds rotate slightly faster than Earth
+    if (cloudsMesh) {
+        cloudsMesh.rotation.y += 0.00008;
+    }
+    
+    // Subtle background stars rotation
+    starsPoints.rotation.y += 0.00005;
 
-    // Compute current plane position on the 3D globe
+    // Compute current plane position on the 3D globe (in local globeGroup space)
     let currentPoint;
 
     if (state.isLive || state.isEstimated) {
@@ -1009,8 +1051,10 @@ function animate() {
     const upDir = new THREE.Vector3().crossVectors(localRight, flightTangent).normalize();
     planeMarker.up.copy(upDir);
 
-    // ── CAMERA: lock on airplane, then update controls ──
-    controls.target.lerp(currentPoint, 0.06);
+    // ── CAMERA: lock on airplane in WORLD space, then update controls ──
+    const worldPlanePos = new THREE.Vector3();
+    planeMarker.getWorldPosition(worldPlanePos);
+    controls.target.lerp(worldPlanePos, 0.06);
     controls.update(); // Must be AFTER target update to avoid 1-frame lag
 
     // Trail particles (emit when live or estimated and moving)

@@ -421,14 +421,14 @@ html, body {
 }
 .btn:hover { background: rgba(255,255,255,0.1); border-color: var(--border-glow); }
 .btn:active { transform: scale(0.96); }
-.btn.playing {
+.btn.playing, .btn.active {
     background: rgba(246, 180, 38, 0.15);
     border-color: rgba(246, 180, 38, 0.4);
     color: var(--oro);
 }
 
-/* Toggle panels button — hidden on desktop */
-#btn-toggle-panels { display: none; }
+/* Toggle panels buttons — hidden on desktop */
+#btn-toggle-telemetry, #btn-toggle-tribute { display: none; }
 
 .credit {
     font-size: 0.7rem;
@@ -482,8 +482,8 @@ html, body {
     /* Show mobile stats */
     .mobile-stats-bar { display: flex; }
 
-    /* Show toggle button */
-    #btn-toggle-panels { display: inline-flex; }
+    /* Show toggle buttons on mobile */
+    #btn-toggle-telemetry, #btn-toggle-tribute { display: inline-flex; }
 
     .ui-overlay {
         grid-template-columns: 1fr;
@@ -504,40 +504,27 @@ html, body {
 
     .instructions-overlay { display: none; }
 
-    /* Side panels become sliding drawers */
-    .telemetry-panel {
+    /* Both panels become mobile bottom sheets occupying the same space to avoid overlap */
+    .telemetry-panel, .tribute-panel {
         position: fixed;
-        left: 0;
-        top: 120px;
-        bottom: 80px;
-        width: 85%;
-        max-width: 340px;
+        left: 4%;
+        right: 4%;
+        top: auto;
+        bottom: 85px; /* stay above mobile footer */
+        width: 92%;
+        max-width: 480px;
+        height: 52%;
+        margin: 0 auto;
         z-index: 150;
-        border-radius: 0 var(--radius) var(--radius) 0;
-        transform: translateX(-105%);
-        transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        border-radius: var(--radius);
+        transform: translateY(125%);
+        transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
         pointer-events: none;
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-color);
     }
-    .telemetry-panel.active {
-        transform: translateX(0);
-        pointer-events: auto;
-    }
-
-    .tribute-panel {
-        position: fixed;
-        right: 0;
-        top: 120px;
-        bottom: 80px;
-        width: 85%;
-        max-width: 340px;
-        z-index: 150;
-        border-radius: var(--radius) 0 0 var(--radius);
-        transform: translateX(105%);
-        transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-        pointer-events: none;
-    }
-    .tribute-panel.active {
-        transform: translateX(0);
+    
+    .telemetry-panel.active, .tribute-panel.active {
+        transform: translateY(0);
         pointer-events: auto;
     }
 
