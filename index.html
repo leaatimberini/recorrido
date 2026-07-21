@@ -2,12 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EL RETORNO DEL REY 👑 | Vuelo N142QS - Tributo a Lionel Messi</title>
-    <meta name="description" content="Sigue en tiempo real y con cámara centrada el vuelo de Lionel Messi de regreso a Rosario, Argentina, tras el mundial. Un tributo 3D interactivo premium.">
-    <link rel="stylesheet" href="style.css?v=4">
-    
-    <!-- Import Map for ES Modules -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EL RETORNO DEL REY 👑 | Vuelo N142QS en Tiempo Real - Lionel Messi</title>
+    <meta name="description" content="Seguí en tiempo real el vuelo de Lionel Messi de Miami a Rosario, Argentina. Tributo 3D interactivo al mejor jugador de todos los tiempos.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=10">
+
     <script type="importmap">
     {
         "imports": {
@@ -18,180 +20,116 @@
     </script>
 </head>
 <body>
-    <!-- 3D Canvas Container -->
+    <!-- 3D Canvas -->
     <div id="canvas-container"></div>
 
-    <!-- COMPACT MOBILE FLOATING STATS (Visible only on mobile) -->
-    <div class="mobile-stats-bar">
+    <!-- Waiting Overlay (shown when plane is on ground) -->
+    <div id="waiting-overlay" class="waiting-overlay">
+        <div class="waiting-content">
+            <div class="waiting-pulse"></div>
+            <div class="waiting-crown">👑</div>
+            <h2>Esperando al 10...</h2>
+            <p>El avión <strong>N142QS</strong> aún no ha despegado</p>
+            <p class="waiting-sub">La página se actualizará automáticamente cuando Messi esté en el aire</p>
+            <div class="waiting-route">
+                <span class="route-city">MIAMI</span>
+                <span class="route-plane">✈</span>
+                <span class="route-city gold">ROSARIO</span>
+            </div>
+            <div class="waiting-timer">Próxima consulta en <span id="countdown">15</span>s</div>
+        </div>
+    </div>
+
+    <!-- Mobile Stats Bar -->
+    <div class="mobile-stats-bar" id="mobile-stats">
         <div class="m-stat-route">MIA ✈ ROS</div>
         <div class="m-stat-item"><span class="m-label">VEL:</span> <span id="m-val-speed">--</span></div>
         <div class="m-stat-item"><span class="m-label">ALT:</span> <span id="m-val-alt">--</span></div>
         <div class="m-stat-item"><span class="m-label">PROG:</span> <span id="m-val-prog">--</span></div>
     </div>
 
-    <!-- UI Overlay Panels -->
-    <div class="ui-overlay">
-        
+    <!-- UI Overlay -->
+    <div class="ui-overlay" id="ui-overlay">
+
         <!-- HEADER -->
-        <header class="interactive-panel header-panel" id="main-header">
+        <header class="interactive-panel header-panel">
             <div class="brand">
-                <span class="badge-vuelo">Vuelo N142QS</span>
+                <span class="badge-vuelo">
+                    <span class="live-dot"></span>
+                    EN VIVO — N142QS
+                </span>
                 <h1>El Retorno del Rey <span>👑</span></h1>
             </div>
             <div class="header-status">
-                <span class="status-dot"></span>
-                <span class="status-text">Cargando Señal...</span>
+                <span class="status-dot" id="status-dot"></span>
+                <span class="status-text" id="status-text">Conectando con ADS-B...</span>
             </div>
         </header>
 
-        <!-- Tooltip Instructions -->
-        <div class="instructions-overlay">
-            Cámara fija en el avión • Arrastra para rotar alrededor • Rueda para Zoom
+        <!-- Instructions -->
+        <div class="instructions-overlay" id="instructions-tip">
+            Cámara fija en el avión • Arrastrá para rotar • Pellizcar o rueda para zoom
         </div>
 
-        <!-- LEFT PANEL - TELEMETRIA -->
-        <aside class="interactive-panel telemetry-panel collapsed" id="telemetry-aside">
-            <div class="section-title">Centro de Control ADS-B</div>
-            
-            <div class="route-container">
-                <div class="route-node">
-                    <div class="iata">MIA</div>
-                    <div class="city">Miami, EE.UU.</div>
-                </div>
-                <div class="route-arrow">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M21,16V14L13,9V3.5A1.5,1.5 0 0,0 11.5,2A1.5,1.5 0 0,0 10,3.5V9L2,14V16L10,13.5V19L8,20.5V22L11.5,21L15,22V20.5L13,19V13.5L21,16Z"/>
-                    </svg>
-                    <span style="font-size:0.55rem;letter-spacing:1px;text-transform:uppercase;margin-top:2px;">Cámara Centrada</span>
-                </div>
-                <div class="route-node">
-                    <div class="iata">ROS</div>
-                    <div class="city">Rosario, ARG</div>
-                </div>
+        <!-- TELEMETRY PANEL -->
+        <aside class="interactive-panel telemetry-panel" id="telemetry-aside">
+            <h2 class="panel-title">
+                <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"/></svg>
+                Telemetría en Tiempo Real
+            </h2>
+            <div class="data-grid">
+                <div class="data-row"><span class="data-label">Latitud</span><span class="data-value" id="val-lat">--</span></div>
+                <div class="data-row"><span class="data-label">Longitud</span><span class="data-value" id="val-lng">--</span></div>
+                <div class="data-row"><span class="data-label">Velocidad</span><span class="data-value" id="val-speed">--</span></div>
+                <div class="data-row"><span class="data-label">Altitud</span><span class="data-value" id="val-alt">--</span></div>
+                <div class="data-row"><span class="data-label">Recorrido</span><span class="data-value" id="val-dist-traveled">--</span></div>
+                <div class="data-row"><span class="data-label">Restante</span><span class="data-value" id="val-dist-remaining">--</span></div>
+                <div class="data-row"><span class="data-label">Tiempo de Vuelo</span><span class="data-value" id="val-elapsed">--</span></div>
+                <div class="data-row"><span class="data-label">Arribo est.</span><span class="data-value" id="val-remaining">--</span></div>
             </div>
-
-            <div class="telemetry-grid">
-                <div class="telemetry-item">
-                    <span class="telemetry-label">Latitud</span>
-                    <span class="telemetry-value highlight-celeste" id="val-lat">--</span>
-                </div>
-                <div class="telemetry-item">
-                    <span class="telemetry-label">Longitud</span>
-                    <span class="telemetry-value highlight-celeste" id="val-lng">--</span>
-                </div>
-                <div class="telemetry-item">
-                    <span class="telemetry-label">Velocidad</span>
-                    <span class="telemetry-value" id="val-speed">--</span>
-                </div>
-                <div class="telemetry-item">
-                    <span class="telemetry-label">Altitud</span>
-                    <span class="telemetry-value" id="val-alt">--</span>
-                </div>
-                <div class="telemetry-item">
-                    <span class="telemetry-label">Dist. Recorrida</span>
-                    <span class="telemetry-value" id="val-dist-traveled">--</span>
-                </div>
-                <div class="telemetry-item">
-                    <span class="telemetry-label">Dist. Restante</span>
-                    <span class="telemetry-value" id="val-dist-remaining">--</span>
-                </div>
-                <div class="telemetry-item">
-                    <span class="telemetry-label">Tiempo Transc.</span>
-                    <span class="telemetry-value" id="val-elapsed">--</span>
-                </div>
-                <div class="telemetry-item">
-                    <span class="telemetry-label">Tiempo Restante</span>
-                    <span class="telemetry-value" id="val-remaining">--</span>
-                </div>
-            </div>
-
-            <div class="progress-section">
-                <div class="progress-info">
-                    <span>Trayecto de Regreso</span>
-                    <span id="progress-percent">0%</span>
-                </div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
-                </div>
+            <div class="progress-container">
+                <div class="progress-labels"><span>MIA</span><span id="progress-percent">0%</span><span>ROS</span></div>
+                <div class="progress-track"><div class="progress-fill" id="progress-bar-fill"></div></div>
             </div>
         </aside>
 
-        <!-- RIGHT PANEL - HOMENAJE -->
-        <aside class="interactive-panel tribute-panel collapsed" id="tribute-aside">
-            <div class="section-title">¡Gracias Capitán!</div>
-            
-            <p class="tribute-text">
-                Tras finalizar un épico Mundial 2026 como subcampeones del mundo, el más grande de la historia regresa a casa. Aunque el bicampeonato no se dio, ¡el orgullo de toda la Argentina es absoluto! Rosario y el país entero te esperan para celebrar tu gloria eterna.
-            </p>
-
-            <blockquote class="messi-quote">
-                "No hay nada más lindo que estar en Argentina. Dimos la vida en cada partido, el cariño de la gente es mi mayor trofeo."
-            </blockquote>
-
-            <div class="section-title" style="margin-top: 10px;">La Ruta del Campeón</div>
-
-            <div class="timeline">
-                <div class="timeline-item">
-                    <span class="timeline-dot"></span>
-                    <div class="timeline-date">2005 - El Comienzo del Sueño</div>
-                    <div class="timeline-desc">Debut de Lio en la selección. Nace la leyenda.</div>
-                </div>
-                <div class="timeline-item">
-                    <span class="timeline-dot"></span>
-                    <div class="timeline-date">2021 - El Maracanazo</div>
-                    <div class="timeline-desc">Campeón de América venciendo a Brasil. ¡Se rompe la sequía!</div>
-                </div>
-                <div class="timeline-item">
-                    <span class="timeline-dot"></span>
-                    <div class="timeline-date">2022 - La Tercera Estrella</div>
-                    <div class="timeline-desc">Campeón del mundo en Qatar. Lio alza la copa dorada.</div>
-                </div>
-                <div class="timeline-item">
-                    <span class="timeline-dot highlight"></span>
-                    <div class="timeline-date">2026 - El Último Baile</div>
-                    <div class="timeline-desc">Subcampeón mundial en Norteamérica. Capitán eterno e inmortal.</div>
-                </div>
+        <!-- TRIBUTE PANEL -->
+        <aside class="interactive-panel tribute-panel" id="tribute-aside">
+            <h2 class="panel-title">
+                <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.63L12,2L9.19,8.63L2,9.24L7.46,13.97L5.82,21L12,17.27Z"/></svg>
+                Homenaje al D10S
+            </h2>
+            <div class="tribute-text">
+                <p class="tribute-lead">Lionel Andrés Messi Cuccittini</p>
+                <p>Rosario, Santa Fe — 24 de junio de 1987</p>
+                <div class="tribute-divider"></div>
+                <p>8 Balones de Oro • Copa del Mundo 2022 🏆</p>
+                <p>Copa América 2021 🏆 • 4 Champions League</p>
+                <p>Máximo goleador de la historia de la Selección Argentina</p>
+                <div class="tribute-divider"></div>
+                <p class="tribute-quote">"No soy el mejor del mundo. Soy un jugador de fútbol que da todo en la cancha."</p>
+                <div class="tribute-divider"></div>
+                <p class="tribute-vuelta"><strong>Vuelve a casa.</strong> El pibe de Rosario vuelve a pisar su tierra.</p>
             </div>
         </aside>
 
-        <!-- BOTTOM PANEL - CONTROLES -->
-        <footer class="interactive-panel control-panel" id="controls-footer">
+        <!-- FOOTER CONTROLS -->
+        <footer class="interactive-panel control-panel">
             <div class="control-group">
-                <button class="btn btn-primary" id="play-pause">
-                    <svg style="width:16px;height:16px;fill:currentColor" viewBox="0 0 24 24">
-                        <path d="M14,19H18V5H14M6,19H10V5H6V19Z"/>
-                    </svg>
-                    Pausar Vuelo
-                </button>
-                <button class="btn btn-audio" id="btn-audio">
-                    <svg style="width:16px;height:16px;fill:currentColor" viewBox="0 0 24 24">
-                        <path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.85 14,18.71V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.77 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/>
-                    </svg>
+                <button class="btn" id="btn-audio" aria-label="Activar sonido del himno Muchachos">
+                    <svg style="width:16px;height:16px;fill:currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.85 14,18.71V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.77 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/></svg>
                     Activar Sonido
                 </button>
-                <!-- UI COLLAPSE TOGGLE BUTTON FOR MOBILE -->
-                <button class="btn" id="btn-toggle-panels" style="display:none;">
+                <button class="btn" id="btn-toggle-panels" aria-label="Mostrar u ocultar paneles de información">
                     Ver Info
                 </button>
             </div>
-
-            <div class="control-group" id="simulation-speed-group">
-                <span class="speed-label" style="font-size:0.75rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.8px;">Velocidad:</span>
-                <div class="speed-selector">
-                    <button class="speed-btn" id="speed-1">x1</button>
-                    <button class="speed-btn" id="speed-10">x10</button>
-                    <button class="speed-btn active" id="speed-100">x100</button>
-                    <button class="speed-btn" id="speed-1000">x1000</button>
-                </div>
-            </div>
-
-            <div class="vancouver-credit">
-                Desarrollado con 💙 y 👑 por <a href="https://github.com/leaatimberini" target="_blank">leaatimberini</a>
+            <div class="credit">
+                Desarrollado con 💙 y 👑 por <a href="https://github.com/leaatimberini" target="_blank" rel="noopener">leaatimberini</a>
             </div>
         </footer>
     </div>
 
-    <!-- Main Entry Module -->
-    <script type="module" src="main.js?v=4"></script>
+    <script type="module" src="main.js?v=10"></script>
 </body>
 </html>
