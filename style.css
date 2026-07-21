@@ -680,3 +680,51 @@ html, body {
     .hud-alt { right: 4%; }
     .hud-header { font-size: 0.75rem; top: 110px; gap: 15px; }
 }
+
+/* ═══════════════════════════════════════════════════════
+   SATELLITE WINDOW VIEW
+   ═══════════════════════════════════════════════════════ */
+.satellite-container {
+    position: fixed;
+    inset: 0;
+    z-index: 1; /* directly above canvas-container (z-index 0) */
+    background: #000;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.satellite-container.hidden {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+.satellite-hud-overlay {
+    position: absolute;
+    top: 80px;
+    left: 20px;
+    background: rgba(5, 8, 20, 0.85);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--celeste);
+    font-family: var(--font);
+    font-size: 0.8rem;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-shadow: 0 0 4px rgba(116, 172, 223, 0.5);
+    z-index: 10;
+}
+.satellite-hud-overlay .hud-line span {
+    color: var(--blanco);
+    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    .satellite-hud-overlay {
+        top: 110px;
+        left: 10px;
+        font-size: 0.72rem;
+    }
+}

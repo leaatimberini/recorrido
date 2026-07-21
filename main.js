@@ -55,7 +55,8 @@ let flightCurve, flightLine, planeMarker;
 let particleGeometry, particlePositions;
 const PARTICLE_COUNT = 250;
 let flightTangent = new THREE.Vector3();
-let cameraMode = 'global'; // 'global' or 'cockpit'
+let cameraMode = 'global'; // 'global', 'cockpit', or 'satellite'
+let lastLoadedLat = 0, lastLoadedLng = 0;
 
 // Audio globals
 let audioCtx = null;
@@ -105,6 +106,11 @@ const DOM = {
     mValSpeed: $('m-val-speed'),
     mValAlt: $('m-val-alt'),
     mValProg: $('m-val-prog'),
+    // Satellite view
+    satelliteContainer: $('satellite-container'),
+    satelliteIframe: $('satellite-iframe'),
+    satHudCoords: $('sat-hud-coords'),
+    satHudSector: $('sat-hud-sector'),
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -950,36 +956,63 @@ function toggleAudio() {
 }
 
 function toggleCameraMode() {
-    cameraMode = cameraMode === 'global' ? 'cockpit' : 'global';
-    if (cameraMode === 'cockpit') {
+    if (cameraMode === 'global') {
+        cameraMode = 'cockpit';
         DOM.cameraBtn.innerHTML = '🎥 Vista: Cabina';
         DOM.cameraBtn.classList.add('playing');
         controls.enabled = false;
         
-        // Show cockpit HUD overlay
         DOM.hud.classList.remove('hidden');
+        DOM.satelliteContainer.classList.add('hidden');
 
-        // Attach camera as child of airplane so it moves and rotates with it
         planeMarker.add(camera);
-        // Position camera inside cockpit, looking forward along +Z axis
         camera.position.set(0, 1.4, 4.2);
-        camera.rotation.set(0, 0, 0); // reset camera local rotation
+        camera.rotation.set(0, 0, 0);
+    } else if (cameraMode === 'cockpit') {
+        cameraMode = 'satellite';
+        DOM.cameraBtn.innerHTML = '🗺️ Vista: Ventanilla';
+        DOM.cameraBtn.classList.add('playing');
+        
+        DOM.hud.classList.add('hidden');
+        DOM.satelliteContainer.classList.remove('hidden');
+
+        scene.add(camera);
+        controls.enabled = false;
+
+        if (state.lat && state.lng) {
+            lastLoadedLat = 0; // force reload
+            updateSatelliteIframe();
+        }
     } else {
+        cameraMode = 'global';
         DOM.cameraBtn.innerHTML = '🎥 Vista: Global';
         DOM.cameraBtn.classList.remove('playing');
         
-        // Hide cockpit HUD overlay
         DOM.hud.classList.add('hidden');
+        DOM.satelliteContainer.classList.add('hidden');
 
-        // Detach camera from plane and restore as root scene element
         scene.add(camera);
         controls.enabled = true;
 
-        // Reposition camera outside facing the airplane
         const worldPlanePos = new THREE.Vector3();
         planeMarker.getWorldPosition(worldPlanePos);
         camera.position.copy(worldPlanePos).add(new THREE.Vector3(100, 40, 120));
         controls.target.copy(worldPlanePos);
+    }
+}
+
+function updateSatelliteIframe() {
+    if (cameraMode !== 'satellite') return;
+    
+    // Check if location shifted significantly to avoid constant iframe reloads
+    const latDiff = Math.abs(state.lat - lastLoadedLat);
+    const lngDiff = Math.abs(state.lng - lastLoadedLng);
+    
+    if (latDiff > 0.002 || lngDiff > 0.002) {
+        lastLoadedLat = state.lat;
+        lastLoadedLng = state.lng;
+        // Load Google Maps satellite embed
+        DOM.satelliteIframe.src = `https://maps.google.com/maps?q=${state.lat.toFixed(6)},${state.lng.toFixed(6)}&t=k&z=9&output=embed`;
     }
 }
 
@@ -1091,6 +1124,32 @@ function updateTelemetryUI() {
             DOM.hudSpeed.textContent = '000';
             DOM.hudAlt.textContent = '00000';
             DOM.hudHdg.textContent = '000°';
+        }
+    }
+
+    // Update Satellite HUD telemetry in real-time
+    if (cameraMode === 'satellite') {
+        if (state.isLive || state.isEstimated) {
+            const lat = state.lat;
+            const lng = state.lng;
+            DOM.satHudCoords.textContent = `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lng).toFixed(4)}° ${lng >= 0 ? 'E' : 'W'}`;
+            
+            // Deduce region
+            let region = 'OCÉANO';
+            if (lat > 22) region = 'FLORIDA / BAHAMAS';
+            else if (lat > 15 && lat <= 22) region = 'MAR CARIBE NORTE';
+            else if (lat > 9 && lat <= 15) region = 'MAR CARIBE SUR';
+            else if (lat > 2 && lat <= 9) region = 'VENEZUELA / COLOMBIA';
+            else if (lat > -5 && lat <= 2) region = 'AMAZONAS / BRASIL';
+            else if (lat > -15 && lat <= -5) region = 'BRASIL CENTRAL';
+            else if (lat > -24 && lat <= -15) region = 'PARAGUAY / CHACO';
+            else region = 'ARGENTINA';
+            
+            DOM.satHudSector.textContent = region;
+            updateSatelliteIframe();
+        } else {
+            DOM.satHudCoords.textContent = '00.0000°, 00.0000°';
+            DOM.satHudSector.textContent = 'ESPERANDO DESPEGUE';
         }
     }
 }

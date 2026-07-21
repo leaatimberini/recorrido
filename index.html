@@ -23,6 +23,16 @@
     <!-- 3D Canvas -->
     <div id="canvas-container"></div>
 
+    <!-- Satellite Window View (Google Maps Satellite Embed) -->
+    <div class="satellite-container hidden" id="satellite-container">
+        <iframe id="satellite-iframe" src="" style="border:0; width:100%; height:100%;" allowfullscreen="" loading="lazy"></iframe>
+        <div class="satellite-hud-overlay">
+            <div class="hud-line">VISTA VENTANILLA EN VIVO ✈️</div>
+            <div class="hud-line">SECTOR: <span id="sat-hud-sector">MAR CARIBE</span></div>
+            <div class="hud-line">COORD: <span id="sat-hud-coords">0.0000°, 0.0000°</span></div>
+        </div>
+    </div>
+
     <!-- Waiting Overlay (shown when plane is on ground) -->
     <div id="waiting-overlay" class="waiting-overlay">
         <div class="waiting-content">
