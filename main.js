@@ -5,16 +5,24 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════
 const GLOBE_RADIUS = 100;
-const MIAMI = { lat: 25.7933, lng: -80.2906 };
-const ROSARIO = { lat: -32.9036, lng: -60.7844 };
-const FLIGHT_DISTANCE_KM = 6586;
+// KFLL Fort Lauderdale-Hollywood (confirmed by FlightAware as actual origin)
+const ORIGIN = { lat: 26.0726, lng: -80.1527, name: 'Fort Lauderdale (FLL)' };
+const DESTINATION = { lat: -32.9036, lng: -60.7844, name: 'Rosario (ROS)' };
+const FLIGHT_DISTANCE_KM = 6800; // FLL to ROS approximate
+const ESTIMATED_FLIGHT_HOURS = 8.5; // Bombardier Global 6000
 
-// OpenSky — N142QS transponder hex
+// N142QS transponder hex code
 const ICAO24 = 'a0ab8d';
-const OPENSKY_URL = `https://opensky-network.org/api/states/all?icao24=${ICAO24}`;
-const POLL_INTERVAL_MS = 15000;
+const POLL_INTERVAL_MS = 12000;
 
-// Multiple CORS proxies with automatic fallback
+// Known departure time from FlightAware: 2026-07-21T01:00Z from KFLL
+const KNOWN_DEPARTURE_UTC = new Date('2026-07-21T01:00:00Z').getTime();
+
+// Data sources — adsb.lol is free & CORS-friendly (primary), OpenSky as fallback
+const ADSB_LOL_URL = `https://api.adsb.lol/v2/icao/${ICAO24}`;
+const OPENSKY_URL = `https://opensky-network.org/api/states/all?icao24=${ICAO24}`;
+
+// CORS proxies for OpenSky only
 const CORS_PROXIES = [
     url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
     url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
@@ -25,16 +33,17 @@ const CORS_PROXIES = [
 // APP STATE — REAL TIME ONLY, NO SIMULATION
 // ═══════════════════════════════════════════════════════════════
 const state = {
-    isLive: false,           // true when transponder data is received
-    hasEverBeenLive: false,  // true once we get first live data
-    lat: MIAMI.lat,
-    lng: MIAMI.lng,
-    altitude: 0,             // feet
-    speed: 0,                // km/h
-    heading: 0,              // degrees
-    progress: 0,             // 0-1 along route
-    lastUpdate: null,        // timestamp of last successful API response
-    departureTime: null,     // estimated departure timestamp
+    isLive: false,            // true when transponder data is received
+    hasEverBeenLive: false,   // true once we get first live data
+    isEstimated: false,       // true when using estimated position (no ADS-B coverage)
+    lat: ORIGIN.lat,
+    lng: ORIGIN.lng,
+    altitude: 0,              // feet
+    speed: 0,                 // km/h
+    heading: 0,               // degrees
+    progress: 0,              // 0-1 along route
+    lastUpdate: null,         // timestamp of last successful API response
+    departureTime: KNOWN_DEPARTURE_UTC,
 };
 
 // Three.js globals
@@ -345,8 +354,8 @@ function latLngToVec3(lat, lng, radius) {
 // FLIGHT PATH, MARKERS, AIRPLANE
 // ═══════════════════════════════════════════════════════════════
 function createFlightPath() {
-    const startV = latLngToVec3(MIAMI.lat, MIAMI.lng, GLOBE_RADIUS);
-    const endV = latLngToVec3(ROSARIO.lat, ROSARIO.lng, GLOBE_RADIUS);
+    const startV = latLngToVec3(ORIGIN.lat, ORIGIN.lng, GLOBE_RADIUS);
+    const endV = latLngToVec3(DESTINATION.lat, DESTINATION.lng, GLOBE_RADIUS);
 
     const mid = new THREE.Vector3().addVectors(startV, endV).multiplyScalar(0.5);
     const dist = startV.distanceTo(endV);
@@ -475,7 +484,7 @@ function buildAirplane() {
     planeMarker = group;
     planeMarker.scale.set(0.7, 0.7, 0.7);
     // Start at Miami
-    planeMarker.position.copy(latLngToVec3(MIAMI.lat, MIAMI.lng, GLOBE_RADIUS));
+    planeMarker.position.copy(latLngToVec3(ORIGIN.lat, ORIGIN.lng, GLOBE_RADIUS));
     scene.add(planeMarker);
 }
 
@@ -513,95 +522,173 @@ function buildTrailParticles(startVec) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// REAL-TIME FLIGHT DATA — OPENSKY NETWORK
+// REAL-TIME FLIGHT DATA — MULTI-SOURCE
+// Primary: adsb.lol (free, CORS-friendly)
+// Fallback: OpenSky Network (via CORS proxies)
+// Estimated: time-based interpolation when over ocean
 // ═══════════════════════════════════════════════════════════════
 let currentProxyIndex = 0;
 
 async function pollFlight() {
-    countdownValue = 15; // Reset countdown
+    countdownValue = 12; // Reset countdown
 
+    // Source 1: adsb.lol (direct, no CORS issues)
+    const liveData = await tryAdsbLol() || await tryOpenSky();
+
+    if (liveData) {
+        applyLiveData(liveData);
+    } else {
+        // No ADS-B coverage — use estimated position if flight has departed
+        handleNoSignal();
+    }
+}
+
+async function tryAdsbLol() {
+    try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const resp = await fetch(ADSB_LOL_URL, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (!resp.ok) return null;
+        const data = await resp.json();
+
+        if (data.ac && data.ac.length > 0) {
+            const ac = data.ac[0];
+            // adsb.lol fields: lat, lon, alt_baro (ft), gs (knots), track
+            if (ac.lat && ac.lon) {
+                console.log('[adsb.lol] Got live data');
+                return {
+                    lat: ac.lat,
+                    lng: ac.lon,
+                    altitude: ac.alt_baro || ac.alt_geom || 0, // already in feet
+                    speed: Math.round((ac.gs || 0) * 1.852),    // knots → km/h
+                    heading: ac.track || ac.true_heading || 0,
+                    source: 'adsb.lol'
+                };
+            }
+        }
+    } catch (e) {
+        console.warn('[adsb.lol] failed:', e.message);
+    }
+    return null;
+}
+
+async function tryOpenSky() {
     for (let attempt = 0; attempt < CORS_PROXIES.length; attempt++) {
-        const proxyIdx = (currentProxyIndex + attempt) % CORS_PROXIES.length;
-        const url = CORS_PROXIES[proxyIdx](OPENSKY_URL);
-
+        const idx = (currentProxyIndex + attempt) % CORS_PROXIES.length;
         try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000);
-
-            const resp = await fetch(url, { signal: controller.signal });
-            clearTimeout(timeout);
-
+            const ctrl = new AbortController();
+            const t = setTimeout(() => ctrl.abort(), 7000);
+            const resp = await fetch(CORS_PROXIES[idx](OPENSKY_URL), { signal: ctrl.signal });
+            clearTimeout(t);
             if (!resp.ok) continue;
             const data = await resp.json();
-
-            // Remember which proxy worked
-            currentProxyIndex = proxyIdx;
+            currentProxyIndex = idx;
 
             if (data.states && data.states.length > 0) {
                 const s = data.states[0];
-                // OpenSky state vector indices:
-                // [5]=longitude, [6]=latitude, [7]=baro_altitude(m), [9]=velocity(m/s), [10]=heading
-                const lng = s[5];
-                const lat = s[6];
-                const altM = s[7] || 0;
-                const velMs = s[9] || 0;
-                const heading = s[10] || 0;
-
-                state.isLive = true;
-                state.hasEverBeenLive = true;
-                state.lat = lat;
-                state.lng = lng;
-                state.altitude = Math.round(altM * 3.28084);
-                state.speed = Math.round(velMs * 3.6);
-                state.heading = heading;
-                state.lastUpdate = Date.now();
-
-                if (!state.departureTime) state.departureTime = Date.now();
-
-                // Calculate progress
-                const startV = latLngToVec3(MIAMI.lat, MIAMI.lng, GLOBE_RADIUS);
-                const endV = latLngToVec3(ROSARIO.lat, ROSARIO.lng, GLOBE_RADIUS);
-                const curV = latLngToVec3(lat, lng, GLOBE_RADIUS);
-                const dFromStart = startV.distanceTo(curV);
-                const dFromEnd = curV.distanceTo(endV);
-                state.progress = Math.max(0, Math.min(dFromStart / (dFromStart + dFromEnd), 1));
-
-                // Hide waiting overlay
-                DOM.waitingOverlay.classList.add('hidden');
-
-                // Update header status
-                DOM.statusDot.className = 'status-dot live';
-                DOM.statusText.className = 'status-text live';
-                DOM.statusText.textContent = '🟢 Transponder en Vivo (ADS-B)';
-
-                console.log(`[LIVE] lat=${lat.toFixed(4)} lng=${lng.toFixed(4)} alt=${state.altitude}ft spd=${state.speed}km/h`);
-            } else {
-                // Plane on ground — API returned null states
-                handlePlaneOnGround();
+                console.log('[OpenSky] Got live data via proxy', idx);
+                return {
+                    lat: s[6],
+                    lng: s[5],
+                    altitude: Math.round((s[7] || 0) * 3.28084),
+                    speed: Math.round((s[9] || 0) * 3.6),
+                    heading: s[10] || 0,
+                    source: 'OpenSky'
+                };
             }
-
-            return; // Success, stop trying proxies
-
-        } catch (err) {
-            console.warn(`[Proxy ${proxyIdx}] failed:`, err.message);
+        } catch (e) {
+            console.warn(`[OpenSky proxy ${idx}]`, e.message);
         }
     }
-
-    // All proxies failed
-    console.warn('[OpenSky] All proxies failed this cycle');
-    if (!state.isLive) handlePlaneOnGround();
+    return null;
 }
 
-function handlePlaneOnGround() {
-    state.isLive = false;
+function applyLiveData({ lat, lng, altitude, speed, heading, source }) {
+    state.isLive = true;
+    state.isEstimated = false;
+    state.hasEverBeenLive = true;
+    state.lat = lat;
+    state.lng = lng;
+    state.altitude = altitude;
+    state.speed = speed;
+    state.heading = heading;
+    state.lastUpdate = Date.now();
 
-    if (!state.hasEverBeenLive) {
+    // Calculate progress
+    const startV = latLngToVec3(ORIGIN.lat, ORIGIN.lng, GLOBE_RADIUS);
+    const endV = latLngToVec3(DESTINATION.lat, DESTINATION.lng, GLOBE_RADIUS);
+    const curV = latLngToVec3(lat, lng, GLOBE_RADIUS);
+    const dStart = startV.distanceTo(curV);
+    const dEnd = curV.distanceTo(endV);
+    state.progress = Math.max(0, Math.min(dStart / (dStart + dEnd), 1));
+
+    // Hide waiting overlay
+    DOM.waitingOverlay.classList.add('hidden');
+
+    DOM.statusDot.className = 'status-dot live';
+    DOM.statusText.className = 'status-text live';
+    DOM.statusText.textContent = `🟢 En Vivo — ${source}`;
+
+    console.log(`[LIVE/${source}] lat=${lat.toFixed(4)} lng=${lng.toFixed(4)} alt=${altitude}ft spd=${speed}km/h`);
+}
+
+function handleNoSignal() {
+    const now = Date.now();
+    const elapsed = now - KNOWN_DEPARTURE_UTC;
+    const totalFlightMs = ESTIMATED_FLIGHT_HOURS * 3600 * 1000;
+
+    // If flight should have departed based on known FlightAware data
+    if (elapsed > 0 && elapsed < totalFlightMs) {
+        // Flight is in the air but over ocean with no ADS-B ground coverage
+        state.isLive = false;
+        state.isEstimated = true;
+        state.hasEverBeenLive = true;
+
+        // Estimate progress based on elapsed time
+        const estimatedProgress = Math.min(elapsed / totalFlightMs, 0.99);
+        state.progress = estimatedProgress;
+
+        // Interpolate lat/lng along great circle
+        const t = estimatedProgress;
+        state.lat = ORIGIN.lat + (DESTINATION.lat - ORIGIN.lat) * t;
+        state.lng = ORIGIN.lng + (DESTINATION.lng - ORIGIN.lng) * t;
+        state.altitude = t < 0.05 ? Math.round(41000 * (t / 0.05))
+                       : t > 0.95 ? Math.round(41000 * ((1 - t) / 0.05))
+                       : 41000;
+        state.speed = 902; // Cruise speed estimate
+
+        // Hide waiting overlay — we know the flight departed
+        DOM.waitingOverlay.classList.add('hidden');
+
+        DOM.statusDot.className = 'status-dot waiting';
+        DOM.statusText.className = 'status-text waiting';
+        DOM.statusText.textContent = '📡 Posición estimada — Sin cobertura ADS-B sobre el océano';
+
+        console.log(`[ESTIMATED] progress=${(estimatedProgress * 100).toFixed(1)}% lat=${state.lat.toFixed(2)} lng=${state.lng.toFixed(2)}`);
+    } else if (elapsed >= totalFlightMs) {
+        // Flight should have landed
+        state.isLive = false;
+        state.isEstimated = false;
+        state.progress = 1;
+        state.lat = DESTINATION.lat;
+        state.lng = DESTINATION.lng;
+        state.altitude = 0;
+        state.speed = 0;
+
+        DOM.waitingOverlay.classList.add('hidden');
+        DOM.statusDot.className = 'status-dot live';
+        DOM.statusText.className = 'status-text live';
+        DOM.statusText.textContent = '🛬 ¡Messi aterrizó en Rosario!';
+    } else {
+        // Flight hasn't departed yet
+        state.isLive = false;
+        state.isEstimated = false;
         DOM.waitingOverlay.classList.remove('hidden');
+        DOM.statusDot.className = 'status-dot waiting';
+        DOM.statusText.className = 'status-text waiting';
+        DOM.statusText.textContent = '⏳ Esperando despegue...';
     }
-
-    DOM.statusDot.className = 'status-dot waiting';
-    DOM.statusText.className = 'status-text waiting';
-    DOM.statusText.textContent = '⏳ Avión en tierra — Esperando despegue';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -809,8 +896,8 @@ function updateTelemetryUI() {
     DOM.progressFill.style.width = `${pct}%`;
     DOM.progressPercent.textContent = `${pct.toFixed(1)}%`;
 
-    if (!state.isLive) {
-        // Show dashes when not live
+    if (!state.isLive && !state.isEstimated) {
+        // Show dashes when not live and not estimated
         const dash = '--';
         DOM.valLat.textContent = dash;
         DOM.valLng.textContent = dash;
@@ -875,15 +962,15 @@ function animate() {
     // Compute current plane position on the 3D globe
     let currentPoint;
 
-    if (state.isLive) {
-        // Real position from transponder data
+    if (state.isLive || state.isEstimated) {
+        // Real position from transponder OR estimated position
         const geoPos = latLngToVec3(state.lat, state.lng, GLOBE_RADIUS);
         // Match the altitude arc of the bezier curve for visual consistency
         const curvePoint = flightCurve.getPointAt(Math.max(0.001, Math.min(state.progress, 0.999)));
         const arcR = curvePoint.length();
         currentPoint = geoPos.normalize().multiplyScalar(arcR);
     } else {
-        // Stay at last known position (or Miami if never received data)
+        // Stay at origin if flight hasn't departed
         currentPoint = latLngToVec3(state.lat, state.lng, GLOBE_RADIUS);
     }
 
@@ -905,7 +992,7 @@ function animate() {
     controls.target.lerp(currentPoint, 0.06);
     controls.update(); // Must be AFTER target update to avoid 1-frame lag
 
-    // Trail particles (only emit when live and moving)
+    // Trail particles (emit when live or estimated and moving)
     updateTrail(currentPoint);
 
     // Update telemetry UI
@@ -917,7 +1004,7 @@ function animate() {
 function updateTrail(planePos) {
     const positions = particleGeometry.attributes.position.array;
 
-    if (state.isLive && state.speed > 50 && Math.random() > 0.3) {
+    if ((state.isLive || state.isEstimated) && state.speed > 50 && Math.random() > 0.3) {
         // Shift particles backward
         for (let i = PARTICLE_COUNT - 1; i > 0; i--) {
             positions[i * 3] = positions[(i - 1) * 3];
