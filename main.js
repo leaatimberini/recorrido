@@ -54,6 +54,7 @@ let flightCurve, flightLine, planeMarker;
 let particleGeometry, particlePositions;
 const PARTICLE_COUNT = 250;
 let flightTangent = new THREE.Vector3();
+let cameraMode = 'global'; // 'global' or 'cockpit'
 
 // Audio globals
 let audioCtx = null;
@@ -80,9 +81,14 @@ const DOM = {
     audioBtn: $('btn-audio'),
     toggleTelemetryBtn: $('btn-toggle-telemetry'),
     toggleTributeBtn: $('btn-toggle-tribute'),
+    cameraBtn: $('btn-camera'),
     telemetryPanel: $('telemetry-aside'),
     tributePanel: $('tribute-aside'),
     instructionsTip: $('instructions-tip'),
+    hud: $('cockpit-hud'),
+    hudSpeed: $('hud-val-speed'),
+    hudAlt: $('hud-val-alt'),
+    hudHdg: $('hud-val-hdg'),
     // Telemetry values
     valLat: $('val-lat'),
     valLng: $('val-lng'),
@@ -902,6 +908,40 @@ function toggleAudio() {
     }
 }
 
+function toggleCameraMode() {
+    cameraMode = cameraMode === 'global' ? 'cockpit' : 'global';
+    if (cameraMode === 'cockpit') {
+        DOM.cameraBtn.innerHTML = '🎥 Vista: Cabina';
+        DOM.cameraBtn.classList.add('playing');
+        controls.enabled = false;
+        
+        // Show cockpit HUD overlay
+        DOM.hud.classList.remove('hidden');
+
+        // Attach camera as child of airplane so it moves and rotates with it
+        planeMarker.add(camera);
+        // Position camera inside cockpit, looking forward along +Z axis
+        camera.position.set(0, 1.4, 4.2);
+        camera.rotation.set(0, 0, 0); // reset camera local rotation
+    } else {
+        DOM.cameraBtn.innerHTML = '🎥 Vista: Global';
+        DOM.cameraBtn.classList.remove('playing');
+        
+        // Hide cockpit HUD overlay
+        DOM.hud.classList.add('hidden');
+
+        // Detach camera from plane and restore as root scene element
+        scene.add(camera);
+        controls.enabled = true;
+
+        // Reposition camera outside facing the airplane
+        const worldPlanePos = new THREE.Vector3();
+        planeMarker.getWorldPosition(worldPlanePos);
+        camera.position.copy(worldPlanePos).add(new THREE.Vector3(100, 40, 120));
+        controls.target.copy(worldPlanePos);
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // EVENT LISTENERS
 // ═══════════════════════════════════════════════════════════════
@@ -941,6 +981,8 @@ function setupEventListeners() {
             DOM.toggleTributeBtn.classList.remove('active');
         }
     });
+
+    DOM.cameraBtn.addEventListener('click', toggleCameraMode);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -997,6 +1039,19 @@ function updateTelemetryUI() {
     if (DOM.mValSpeed) DOM.mValSpeed.textContent = `${state.speed} km/h`;
     if (DOM.mValAlt) DOM.mValAlt.textContent = `${state.altitude.toLocaleString()} pies`;
     if (DOM.mValProg) DOM.mValProg.textContent = `${pct.toFixed(1)}%`;
+
+    // Update Cockpit HUD telemetry in real-time
+    if (cameraMode === 'cockpit') {
+        if (state.isLive || state.isEstimated) {
+            DOM.hudSpeed.textContent = state.speed.toString().padStart(3, '0');
+            DOM.hudAlt.textContent = state.altitude.toString().padStart(5, '0');
+            DOM.hudHdg.textContent = `${Math.round(state.heading).toString().padStart(3, '0')}°`;
+        } else {
+            DOM.hudSpeed.textContent = '000';
+            DOM.hudAlt.textContent = '00000';
+            DOM.hudHdg.textContent = '000°';
+        }
+    }
 }
 
 function formatTime(secs) {
@@ -1052,10 +1107,16 @@ function animate() {
     planeMarker.up.copy(upDir);
 
     // ── CAMERA: lock on airplane in WORLD space, then update controls ──
-    const worldPlanePos = new THREE.Vector3();
-    planeMarker.getWorldPosition(worldPlanePos);
-    controls.target.lerp(worldPlanePos, 0.06);
-    controls.update(); // Must be AFTER target update to avoid 1-frame lag
+    if (cameraMode === 'global') {
+        const worldPlanePos = new THREE.Vector3();
+        planeMarker.getWorldPosition(worldPlanePos);
+        controls.target.lerp(worldPlanePos, 0.06);
+        controls.update(); // Must be AFTER target update to avoid 1-frame lag
+    } else {
+        // In cockpit mode, camera position and rotation are parented to planeMarker
+        // We orient the camera looking forward along the positive Z local axis
+        camera.lookAt(0, 1.4, 20);
+    }
 
     // Trail particles (emit when live or estimated and moving)
     updateTrail(currentPoint);

@@ -551,3 +551,132 @@ html, body {
     .m-stat-item { font-size: 0.65rem; }
     .btn { padding: 8px 10px; font-size: 0.7rem; }
 }
+
+/* ═══════════════════════════════════════════════════════
+   COCKPIT HUD (futuristic green avionics overlay)
+   ═══════════════════════════════════════════════════════ */
+.cockpit-hud {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #00e676;
+    text-shadow: 0 0 4px rgba(0, 230, 118, 0.6);
+    font-family: monospace;
+    opacity: 0.85;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.cockpit-hud.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.hud-crosshair {
+    width: 60px;
+    height: 60px;
+    border: 1px solid #00e676;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.hud-crosshair::before, .hud-crosshair::after {
+    content: '';
+    position: absolute;
+    background: #00e676;
+}
+.hud-crosshair::before {
+    top: 50%;
+    left: -15px;
+    width: 15px;
+    height: 1px;
+}
+.hud-crosshair::after {
+    top: 50%;
+    right: -15px;
+    width: 15px;
+    height: 1px;
+}
+
+.hud-tape {
+    position: absolute;
+    top: 30%;
+    bottom: 30%;
+    width: 70px;
+    border-left: 1px solid #00e676;
+    border-right: 1px solid #00e676;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 10px 4px;
+    font-size: 0.8rem;
+    background: rgba(0, 230, 118, 0.03);
+}
+
+.hud-speed {
+    left: 12%;
+}
+
+.hud-alt {
+    right: 12%;
+}
+
+.hud-tape-label {
+    text-align: center;
+    font-weight: bold;
+    border-bottom: 1px solid #00e676;
+    padding-bottom: 4px;
+}
+
+.hud-tape-val {
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 800;
+    background: rgba(0, 230, 118, 0.15);
+    border: 1px solid #00e676;
+    padding: 2px 0;
+    margin: 10px 0;
+}
+
+.hud-tape-ticks {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0.7;
+    font-size: 0.7rem;
+}
+
+.hud-header {
+    position: absolute;
+    top: 80px;
+    display: flex;
+    gap: 30px;
+    font-size: 0.9rem;
+    background: rgba(0, 230, 118, 0.08);
+    border: 1px solid #00e676;
+    padding: 6px 16px;
+    border-radius: 4px;
+}
+
+.hud-center-pitch {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 100px;
+    border-top: 1px dashed rgba(0, 230, 118, 0.4);
+    border-bottom: 1px dashed rgba(0, 230, 118, 0.4);
+}
+
+@media (max-width: 768px) {
+    .hud-speed { left: 4%; }
+    .hud-alt { right: 4%; }
+    .hud-header { font-size: 0.75rem; top: 110px; gap: 15px; }
+}

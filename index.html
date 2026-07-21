@@ -126,11 +126,47 @@
                 <button class="btn" id="btn-toggle-tribute" aria-label="Mostrar homenaje a Messi">
                     👑 Homenaje
                 </button>
+                <button class="btn" id="btn-camera" aria-label="Cambiar vista de cámara">
+                    🎥 Vista: Global
+                </button>
             </div>
             <div class="credit">
                 Desarrollado con 💙 y 👑 por <a href="https://github.com/leaatimberini" target="_blank" rel="noopener">leaatimberini</a>
             </div>
         </footer>
+
+        <!-- Cockpit HUD overlay (visible in cockpit view only) -->
+        <div class="cockpit-hud hidden" id="cockpit-hud">
+            <div class="hud-crosshair"></div>
+            <div class="hud-tape hud-speed">
+                <div class="hud-tape-label">SPD</div>
+                <div class="hud-tape-val" id="hud-val-speed">000</div>
+                <div class="hud-tape-ticks">
+                    <div>- 950</div>
+                    <div>- 900</div>
+                    <div>- 850</div>
+                    <div>- 800</div>
+                </div>
+            </div>
+            <div class="hud-tape hud-alt">
+                <div class="hud-tape-label">ALT</div>
+                <div class="hud-tape-val" id="hud-val-alt">00000</div>
+                <div class="hud-tape-ticks">
+                    <div>- 43000</div>
+                    <div>- 41000</div>
+                    <div>- 39000</div>
+                    <div>- 37000</div>
+                </div>
+            </div>
+            <div class="hud-header">
+                <div>HDG <span id="hud-val-hdg">000°</span></div>
+                <div>XPNDR: a0ab8d</div>
+                <div>STATUS: AP ACTIVE</div>
+            </div>
+            <div class="hud-center-pitch">
+                <div class="hud-pitch-line"></div>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="main.js?v=10"></script>
